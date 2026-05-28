@@ -37,6 +37,9 @@ const actionPlanBoard = document.querySelector("#actionPlanBoard");
 const refreshActionPlan = document.querySelector("#refreshActionPlan");
 const companyPlanSelect = document.querySelector("#companyPlanSelect");
 const saveCompanyPlan = document.querySelector("#saveCompanyPlan");
+const platformAdminPanel = document.querySelector("#platformAdminPanel");
+const platformCompanyList = document.querySelector("#platformCompanyList");
+const refreshPlatformCompanies = document.querySelector("#refreshPlatformCompanies");
 
 let hseQuestions = [];
 
@@ -121,6 +124,7 @@ async function loginWithCredentials(email, password) {
   await loadFeedback();
   await loadHseStatus();
   await loadActionPlan();
+  await loadPlatformCompanies();
   setRole(currentUser.role === "employee" ? "employee" : "manager", false);
   showToast(`Conectado como ${currentUser.name}.`);
 }
@@ -147,6 +151,7 @@ async function registerCompany(formData) {
   await loadFeedback();
   await loadHseStatus();
   await loadActionPlan();
+  await loadPlatformCompanies();
   setRole("manager", false);
   showToast("Empresa criada. Você entrou como administrador.");
 }
@@ -228,6 +233,80 @@ async function loadActionPlan() {
   } catch (error) {
     actionPlanBoard.innerHTML = `<p>${error.message}</p>`;
   }
+}
+
+async function loadPlatformCompanies() {
+  if (!platformAdminPanel || !platformCompanyList) return;
+  const isPlatformAdmin = currentUser?.role === "admin" && currentUser?.email === "admin@equilibria.demo";
+  platformAdminPanel.style.display = isPlatformAdmin ? "grid" : "none";
+  if (!isPlatformAdmin) return;
+  try {
+    const data = await request("/api/platform/companies");
+    renderPlatformCompanies(data.companies || []);
+  } catch (error) {
+    platformCompanyList.innerHTML = `<p>${error.message}</p>`;
+  }
+}
+
+function renderPlatformCompanies(companies) {
+  if (!companies.length) {
+    platformCompanyList.innerHTML = "<p>Nenhuma empresa cadastrada ainda.</p>";
+    return;
+  }
+  platformCompanyList.innerHTML = companies
+    .map(
+      (company) => `
+        <article class="platform-company-card" data-company-id="${company.id}">
+          <div class="platform-company-head">
+            <div>
+              <strong>${company.name}</strong>
+              <small>${company.users} usuário(s) · ${company.checkins} check-in(s) · ${company.hseResponses} HSE · ${company.feedback} relato(s)</small>
+            </div>
+            <span class="status-pill ${company.active ? "stable" : "danger"}">${company.active ? labelCompanyStatus(company.status) : company.expired ? "Vencido" : labelCompanyStatus(company.status)}</span>
+          </div>
+          <div class="platform-company-controls">
+            <label>
+              Plano
+              <select name="plan">
+                ${["Essencial", "Profissional", "Enterprise"].map((plan) => `<option ${company.plan === plan ? "selected" : ""} value="${plan}">${plan}</option>`).join("")}
+              </select>
+            </label>
+            <label>
+              Status
+              <select name="status">
+                ${[
+                  ["trial", "Teste"],
+                  ["active", "Ativo"],
+                  ["paused", "Pausado"],
+                  ["cancelled", "Cancelado"],
+                ]
+                  .map(([value, label]) => `<option ${company.status === value ? "selected" : ""} value="${value}">${label}</option>`)
+                  .join("")}
+              </select>
+            </label>
+            <label>
+              Vencimento
+              <input name="expiresAt" type="date" value="${company.expiresAt || ""}" />
+            </label>
+            <label>
+              Colaboradores
+              <input name="employeeCount" min="1" type="number" value="${company.employeeCount || company.users || 1}" />
+            </label>
+          </div>
+          <button class="primary-button wide" data-save-company="${company.id}" type="button">Salvar cliente</button>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function labelCompanyStatus(status) {
+  return {
+    trial: "Teste",
+    active: "Ativo",
+    paused: "Pausado",
+    cancelled: "Cancelado",
+  }[status] || "Ativo";
 }
 
 function renderHseQuestions(questions, alreadyAnswered) {
@@ -758,6 +837,29 @@ hseForm?.addEventListener("submit", async (event) => {
 });
 
 refreshActionPlan?.addEventListener("click", loadActionPlan);
+refreshPlatformCompanies?.addEventListener("click", loadPlatformCompanies);
+
+platformCompanyList?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-save-company]");
+  if (!button) return;
+  const card = button.closest(".platform-company-card");
+  const companyId = button.dataset.saveCompany;
+  try {
+    await request(`/api/platform/companies/${encodeURIComponent(companyId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        plan: card.querySelector('[name="plan"]').value,
+        status: card.querySelector('[name="status"]').value,
+        expiresAt: card.querySelector('[name="expiresAt"]').value,
+        employeeCount: Number(card.querySelector('[name="employeeCount"]').value),
+      }),
+    });
+    await loadPlatformCompanies();
+    showToast("Cliente atualizado.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
 
 checkinForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -850,11 +952,12 @@ async function boot() {
       updateUserBadge();
       await loadDashboard();
       await loadPersonalReport();
-      await loadUsers();
-      await loadFeedback();
-      await loadHseStatus();
-      await loadActionPlan();
-      setRole(currentUser.role === "employee" ? "employee" : "manager", false);
+    await loadUsers();
+    await loadFeedback();
+    await loadHseStatus();
+    await loadActionPlan();
+    await loadPlatformCompanies();
+    setRole(currentUser.role === "employee" ? "employee" : "manager", false);
     } else {
       authModal.classList.add("show");
     }

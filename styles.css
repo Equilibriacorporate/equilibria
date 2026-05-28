@@ -899,6 +899,66 @@ textarea {
   font-weight: 800;
 }
 
+.platform-admin-panel {
+  display: none;
+  margin-top: 14px;
+}
+
+.platform-company-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.platform-company-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.platform-company-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.platform-company-head strong,
+.platform-company-head small {
+  display: block;
+}
+
+.platform-company-head small {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.platform-company-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.platform-company-controls label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.platform-company-controls input,
+.platform-company-controls select {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: var(--ink);
+}
+
 .chat-panel {
   display: grid;
   gap: 12px;
@@ -1377,6 +1437,15 @@ textarea {
 
   .hse-dimension div:first-child {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .platform-company-head,
+  .platform-company-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-company-head {
     flex-direction: column;
   }
 

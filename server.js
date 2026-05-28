@@ -225,6 +225,8 @@ function createSeedData() {
         id: "c_demo",
         name: "Empresa Demo",
         plan: "Profissional",
+        status: "trial",
+        expiresAt: "2026-06-30",
         employeeCount: 100,
         teams: ["Atendimento", "Comercial", "Produto", "Operações", "Financeiro"],
       },
@@ -281,6 +283,10 @@ function requireManager(user) {
   return user.role === "manager" || user.role === "admin";
 }
 
+function requirePlatformAdmin(user) {
+  return user.role === "admin" && user.email === "admin@equilibria.demo";
+}
+
 function currentMonthKey(date = new Date()) {
   return date.toISOString().slice(0, 7);
 }
@@ -288,6 +294,18 @@ function currentMonthKey(date = new Date()) {
 function companyPlan(db, user) {
   const company = db.companies.find((item) => item.id === user.companyId) || {};
   return planCatalog[company.plan] || planCatalog.Profissional;
+}
+
+function companyAccessStatus(company = {}) {
+  const status = company.status || "active";
+  const expiresAt = company.expiresAt || "";
+  const expired = expiresAt ? new Date(expiresAt) < new Date() : false;
+  return {
+    status,
+    expiresAt,
+    active: status !== "paused" && status !== "cancelled" && !expired,
+    expired,
+  };
 }
 
 function requireFeature(db, user, feature) {
@@ -531,6 +549,32 @@ function buildDashboard(db, user) {
   };
 }
 
+function platformCompanies(db) {
+  return db.companies.map((company) => {
+    const users = db.users.filter((user) => user.companyId === company.id);
+    const checkins = db.checkins.filter((entry) => entry.companyId === company.id);
+    const hse = (db.hseResponses || []).filter((item) => item.companyId === company.id);
+    const feedback = (db.feedback || []).filter((item) => item.companyId === company.id);
+    const access = companyAccessStatus(company);
+    return {
+      id: company.id,
+      name: company.name,
+      plan: company.plan || "Profissional",
+      status: access.status,
+      expiresAt: access.expiresAt,
+      active: access.active,
+      expired: access.expired,
+      employeeCount: company.employeeCount || users.length,
+      teams: company.teams || [],
+      users: users.length,
+      checkins: checkins.length,
+      hseResponses: hse.length,
+      feedback: feedback.length,
+      createdAt: company.createdAt || "",
+    };
+  });
+}
+
 function buildPersonalReport(db, user) {
   const entries = companyEntries(db, user).filter((entry) => entry.userId === user.id).slice(-8);
   const fallback = companyEntries(db, user).slice(-8);
@@ -634,6 +678,8 @@ async function routeApi(req, res) {
         id: companyId,
         name: String(body.companyName).trim(),
         plan: "Profissional",
+        status: "trial",
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString().slice(0, 10),
         employeeCount: Number(body.employeeCount || 10),
         teams: teams.length ? teams : ["Geral"],
         createdAt: new Date().toISOString(),
@@ -667,6 +713,14 @@ async function routeApi(req, res) {
       return;
     }
 
+    const currentCompany = db.companies.find((item) => item.id === user.companyId);
+    const access = companyAccessStatus(currentCompany);
+    const allowedWhenInactive = ["/api/logout", "/api/me"];
+    if (!access.active && !requirePlatformAdmin(user) && !allowedWhenInactive.includes(url.pathname)) {
+      sendJson(res, 402, { error: access.expired ? "Acesso vencido. Fale com a Equilibria para renovar." : "Acesso pausado. Fale com a Equilibria para reativar." });
+      return;
+    }
+
     if (req.method === "POST" && url.pathname === "/api/logout") {
       const token = getBearerToken(req);
       if (token) sessions.delete(token);
@@ -676,7 +730,46 @@ async function routeApi(req, res) {
 
     if (req.method === "GET" && url.pathname === "/api/me") {
       const company = db.companies.find((item) => item.id === user.companyId);
-      sendJson(res, 200, { user: publicUser(user), company });
+      sendJson(res, 200, { user: publicUser(user), company: { ...company, access: companyAccessStatus(company) } });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/platform/companies") {
+      if (!requirePlatformAdmin(user)) {
+        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
+        return;
+      }
+      sendJson(res, 200, { companies: platformCompanies(db), plans: planCatalog });
+      return;
+    }
+
+    if (req.method === "PATCH" && url.pathname.startsWith("/api/platform/companies/")) {
+      if (!requirePlatformAdmin(user)) {
+        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
+        return;
+      }
+      const companyId = decodeURIComponent(url.pathname.split("/").pop());
+      const company = db.companies.find((item) => item.id === companyId);
+      if (!company) {
+        sendJson(res, 404, { error: "Empresa não encontrada" });
+        return;
+      }
+      const body = await readBody(req);
+      if (body.plan && !planCatalog[body.plan]) {
+        sendJson(res, 400, { error: "Plano inválido" });
+        return;
+      }
+      if (body.status && !["trial", "active", "paused", "cancelled"].includes(body.status)) {
+        sendJson(res, 400, { error: "Status inválido" });
+        return;
+      }
+      if (body.plan) company.plan = body.plan;
+      if (body.status) company.status = body.status;
+      if (body.expiresAt !== undefined) company.expiresAt = String(body.expiresAt || "");
+      if (body.employeeCount !== undefined) company.employeeCount = Number(body.employeeCount || company.employeeCount || 0);
+      db.audit.push({ id: `audit_${Date.now()}`, action: "platform.company.updated", userId: user.id, companyId, date: new Date().toISOString(), changes: body });
+      writeDb(db);
+      sendJson(res, 200, { company: platformCompanies(db).find((item) => item.id === companyId) });
       return;
     }
 
