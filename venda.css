@@ -481,10 +481,27 @@ p {
 }
 
 @media (max-width: 980px) {
-  .site-header,
-  nav {
+  .site-header {
     align-items: stretch;
     flex-direction: column;
+    gap: 12px;
+    padding: 14px 18px;
+  }
+
+  nav {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  nav a {
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
   }
 
   .hero,
@@ -503,5 +520,62 @@ p {
 
   h1 {
     font-size: clamp(2.6rem, 14vw, 4.2rem);
+  }
+
+  .hero {
+    min-height: auto;
+    padding-top: 38px;
+  }
+
+  .hero-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .button {
+    min-height: 48px;
+    width: 100%;
+  }
+
+  .dashboard-preview {
+    padding: 14px;
+  }
+
+  .metric-large {
+    min-height: 170px;
+    padding: 22px;
+  }
+
+  .metric-large strong {
+    font-size: 4.1rem;
+  }
+
+  .preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pain-band,
+  .section,
+  .law-band,
+  .workflow,
+  .proof,
+  .pilot,
+  .faq,
+  .cta {
+    padding: 42px 18px;
+  }
+
+  .pilot-card,
+  .law-copy,
+  .pain-grid article,
+  .feature-list article,
+  .proof-grid article,
+  .pricing article,
+  .faq-list article {
+    padding: 18px;
+  }
+
+  .legal-footer {
+    padding: 20px 18px;
   }
 }
