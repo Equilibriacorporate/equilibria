@@ -7,6 +7,8 @@ COPY server.js ./
 COPY index.html ./
 COPY styles.css ./
 COPY app.js ./
+COPY venda.html ./
+COPY venda.css ./
 COPY README.md ./
 COPY PROPOSTA_COMERCIAL.md ./
 COPY ROADMAP.md ./
