@@ -454,6 +454,20 @@ p {
   margin: 0 auto;
 }
 
+.legal-footer {
+  display: grid;
+  gap: 6px;
+  padding: 22px clamp(18px, 5vw, 72px);
+  border-top: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.legal-footer strong {
+  color: var(--ink);
+}
+
 @media (max-width: 980px) {
   .site-header,
   nav {
