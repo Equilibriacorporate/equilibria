@@ -43,6 +43,10 @@
             <span aria-hidden="true">◌</span>
             Check-in
           </button>
+          <button class="nav-item" data-section="hse" type="button">
+            <span aria-hidden="true">H</span>
+            HSE mensal
+          </button>
           <button class="nav-item" data-section="personal" type="button">
             <span aria-hidden="true">◎</span>
             Meu relatório
@@ -54,6 +58,10 @@
           <button class="nav-item" data-section="interventions" type="button">
             <span aria-hidden="true">!</span>
             Intervenções
+          </button>
+          <button class="nav-item" data-section="actionplan" type="button">
+            <span aria-hidden="true">✓</span>
+            Plano RH
           </button>
           <button class="nav-item" data-section="assistant" type="button">
             <span aria-hidden="true">✦</span>
@@ -262,6 +270,42 @@
           </form>
         </section>
 
+        <section class="workspace-section" id="hse" aria-labelledby="hseTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Mensal</p>
+              <h2 id="hseTitle">Questionário psicossocial</h2>
+            </div>
+            <span class="status-pill private" id="hseStatus">1 vez por mês</span>
+          </div>
+
+          <div class="two-column">
+            <form class="checkin-form hse-form" id="hseForm">
+              <div class="panel-title">
+                <div>
+                  <h3>Leitura tipo HSE adaptada</h3>
+                  <p>Responda pensando no último mês. Escala: 1 discordo totalmente, 5 concordo totalmente.</p>
+                </div>
+              </div>
+              <div class="hse-question-list" id="hseQuestions"></div>
+              <label class="text-field">
+                Observação opcional
+                <textarea name="notes" placeholder="Contexto geral sobre demandas, apoio, mudanças ou relações."></textarea>
+              </label>
+              <button class="primary-button wide" type="submit">Enviar questionário mensal</button>
+            </form>
+
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Resumo para RH</h3>
+                <span>Dimensões HSE</span>
+              </div>
+              <p>O resultado agregado ajuda a priorizar riscos psicossociais sem expor respostas individuais.</p>
+              <div class="hse-summary" id="hseSummaryPanel"></div>
+            </article>
+          </div>
+        </section>
+
         <section class="workspace-section" id="personal" aria-labelledby="personalTitle">
           <div class="section-heading">
             <div>
@@ -305,6 +349,24 @@
           </div>
 
           <div class="intervention-board" id="interventionBoard"></div>
+        </section>
+
+        <section class="workspace-section" id="actionplan" aria-labelledby="actionPlanTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">RH estratégico</p>
+              <h2 id="actionPlanTitle">Plano de ação do RH</h2>
+            </div>
+            <span class="status-pill stable">Gerado por dados agregados</span>
+          </div>
+          <article class="panel">
+            <div class="panel-title">
+              <h3>Prioridades recomendadas</h3>
+              <button class="ghost-button" id="refreshActionPlan" type="button">Atualizar plano</button>
+            </div>
+            <p>Combina check-ins, questionário mensal e voz anônima para sugerir ações preventivas.</p>
+            <div class="action-plan-board" id="actionPlanBoard"></div>
+          </article>
         </section>
 
         <section class="workspace-section" id="assistant" aria-labelledby="assistantTitle">
@@ -407,6 +469,8 @@
                 <li>Dashboard de RH e liderança</li>
                 <li>IA de apoio interno</li>
                 <li>Risco de burnout por equipe</li>
+                <li>Questionário mensal tipo HSE</li>
+                <li>Plano de ação do RH</li>
                 <li>Recomendações de intervenção</li>
               </ul>
               <button class="primary-button" data-plan="Profissional" type="button">Simular</button>
@@ -420,6 +484,7 @@
                 <li>Integrações e API</li>
                 <li>Relatórios executivos personalizados</li>
                 <li>Governança LGPD avançada</li>
+                <li>HSE mensal e plano RH avançado</li>
                 <li>Onboarding e suporte dedicado</li>
               </ul>
               <button class="ghost-button" data-plan="Enterprise" type="button">Simular</button>
@@ -446,10 +511,19 @@
                   <option value="39.9">Enterprise</option>
                 </select>
               </label>
+              <label>
+                Plano ativo da empresa
+                <select id="companyPlanSelect">
+                  <option value="Essencial">Essencial</option>
+                  <option selected value="Profissional">Profissional</option>
+                  <option value="Enterprise">Enterprise</option>
+                </select>
+              </label>
             </div>
             <div class="simulator-result">
               <span>Mensalidade estimada</span>
               <strong id="monthlyRevenue">R$ 1.990</strong>
+              <button class="primary-button wide" id="saveCompanyPlan" type="button">Aplicar plano ativo</button>
               <small>mínimo recomendado: R$ 299/mês</small>
             </div>
           </article>

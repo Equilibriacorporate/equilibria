@@ -29,6 +29,16 @@ const userForm = document.querySelector("#userForm");
 const userList = document.querySelector("#userList");
 const feedbackForm = document.querySelector("#feedbackForm");
 const anonymousList = document.querySelector("#anonymousList");
+const hseForm = document.querySelector("#hseForm");
+const hseQuestionsContainer = document.querySelector("#hseQuestions");
+const hseStatus = document.querySelector("#hseStatus");
+const hseSummaryPanel = document.querySelector("#hseSummaryPanel");
+const actionPlanBoard = document.querySelector("#actionPlanBoard");
+const refreshActionPlan = document.querySelector("#refreshActionPlan");
+const companyPlanSelect = document.querySelector("#companyPlanSelect");
+const saveCompanyPlan = document.querySelector("#saveCompanyPlan");
+
+let hseQuestions = [];
 
 function showToast(message) {
   toast.textContent = message;
@@ -109,6 +119,8 @@ async function loginWithCredentials(email, password) {
   await loadPersonalReport();
   await loadUsers();
   await loadFeedback();
+  await loadHseStatus();
+  await loadActionPlan();
   setRole(currentUser.role === "employee" ? "employee" : "manager", false);
   showToast(`Conectado como ${currentUser.name}.`);
 }
@@ -133,6 +145,8 @@ async function registerCompany(formData) {
   await loadPersonalReport();
   await loadUsers();
   await loadFeedback();
+  await loadHseStatus();
+  await loadActionPlan();
   setRole("manager", false);
   showToast("Empresa criada. Você entrou como administrador.");
 }
@@ -186,6 +200,101 @@ async function loadFeedback() {
   } catch (error) {
     anonymousList.innerHTML = `<p>${error.message}</p>`;
   }
+}
+
+async function loadHseStatus() {
+  if (!hseQuestionsContainer) return;
+  try {
+    const data = await request("/api/hse-status");
+    hseQuestions = data.questions || [];
+    renderHseQuestions(hseQuestions, data.alreadyAnswered);
+    renderHseSummary(data.summary, data.alreadyAnswered, data.month);
+  } catch (error) {
+    hseQuestionsContainer.innerHTML = `<p>${error.message}</p>`;
+    hseSummaryPanel.innerHTML = `<p>${error.message}</p>`;
+    hseStatus.textContent = "Indisponível no plano";
+  }
+}
+
+async function loadActionPlan() {
+  if (!actionPlanBoard) return;
+  if (!currentUser || currentUser.role === "employee") {
+    actionPlanBoard.innerHTML = "<p>Disponível para RH/Gestor nos planos Profissional e Enterprise.</p>";
+    return;
+  }
+  try {
+    const data = await request("/api/rh-action-plan");
+    renderActionPlan(data);
+  } catch (error) {
+    actionPlanBoard.innerHTML = `<p>${error.message}</p>`;
+  }
+}
+
+function renderHseQuestions(questions, alreadyAnswered) {
+  if (!questions.length) {
+    hseQuestionsContainer.innerHTML = "<p>Questionário indisponível.</p>";
+    return;
+  }
+  hseStatus.textContent = alreadyAnswered ? "Respondido neste mês" : "Disponível este mês";
+  hseForm.querySelector("button[type='submit']").disabled = alreadyAnswered;
+  hseQuestionsContainer.innerHTML = questions
+    .map(
+      (question, index) => `
+        <fieldset class="hse-question">
+          <legend>${index + 1}. ${question.text}</legend>
+          <div class="hse-scale">
+            ${[1, 2, 3, 4, 5]
+              .map(
+                (value) => `
+                  <label>
+                    <input ${value === 3 ? "checked" : ""} name="${question.id}" type="radio" value="${value}" />
+                    <span>${value}</span>
+                  </label>
+                `,
+              )
+              .join("")}
+          </div>
+        </fieldset>
+      `,
+    )
+    .join("");
+}
+
+function renderHseSummary(summary, alreadyAnswered, month) {
+  if (!summary) {
+    hseSummaryPanel.innerHTML = alreadyAnswered ? `<p>Você já respondeu o questionário de ${month}. O RH vê apenas resultados agregados.</p>` : "<p>Após o envio, as respostas entram no resumo agregado do mês.</p>";
+    return;
+  }
+  hseSummaryPanel.innerHTML = `
+    <div class="hse-count">${summary.count} resposta(s) em ${summary.month}</div>
+    ${summary.dimensions
+      .map(
+        (dimension) => `
+          <div class="hse-dimension">
+            <div><strong>${dimension.label}</strong><span>${dimension.percent}% favorável</span></div>
+            <div class="progress ${dimension.percent < 60 ? "risk" : ""}"><span style="width:${dimension.percent}%"></span></div>
+          </div>
+        `,
+      )
+      .join("")}
+  `;
+}
+
+function renderActionPlan(data) {
+  actionPlanBoard.innerHTML = data.actions
+    .map((item) => {
+      const priorityClass = item.priority === "Alta" ? "alta" : item.priority === "Média" ? "media" : "baixa";
+      return `
+        <article class="action-card ${priorityClass}">
+          <span class="status-pill ${item.priority === "Alta" ? "danger" : item.priority === "Média" ? "private" : "stable"}">${item.priority}</span>
+          <h3>${item.focus}</h3>
+          <p><strong>Evidência:</strong> ${item.evidence}</p>
+          <p><strong>Ação:</strong> ${item.action}</p>
+          <small>${item.owner} · prazo: ${item.deadline}</small>
+        </article>
+      `;
+    })
+    .join("");
 }
 
 function renderFeedback(items) {
@@ -254,6 +363,7 @@ function renderUsers(users) {
 
 function renderDashboard(data) {
   const { metrics, teams, alerts, recentEntries } = data;
+  if (companyPlanSelect && data.company?.plan) companyPlanSelect.value = data.company.plan;
   document.querySelector("#avgMood").textContent = decimal(metrics.mood);
   document.querySelector("#avgEnergy").textContent = percent(metrics.energy * 10);
   document.querySelector("#burnoutRisk").textContent = percent(metrics.risk);
@@ -599,6 +709,7 @@ feedbackForm.addEventListener("submit", async (event) => {
     });
     feedbackForm.reset();
     await loadFeedback();
+    await loadActionPlan();
     showToast("Relato anônimo enviado com segurança.");
   } catch (error) {
     showToast(error.message);
@@ -606,6 +717,47 @@ feedbackForm.addEventListener("submit", async (event) => {
 });
 
 planSelect.addEventListener("change", updatePricing);
+
+companyPlanSelect?.addEventListener("change", () => {
+  const prices = { Essencial: "14.9", Profissional: "19.9", Enterprise: "39.9" };
+  planSelect.value = prices[companyPlanSelect.value] || "19.9";
+  updatePricing();
+});
+
+saveCompanyPlan?.addEventListener("click", async () => {
+  try {
+    await request("/api/company/plan", {
+      method: "POST",
+      body: JSON.stringify({ plan: companyPlanSelect.value }),
+    });
+    await loadDashboard();
+    await loadHseStatus();
+    await loadActionPlan();
+    showToast(`Plano ${companyPlanSelect.value} aplicado.`);
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+hseForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(hseForm);
+  const answers = Object.fromEntries(hseQuestions.map((question) => [question.id, Number(formData.get(question.id))]));
+  try {
+    await request("/api/hse-responses", {
+      method: "POST",
+      body: JSON.stringify({ answers, notes: formData.get("notes") }),
+    });
+    hseForm.reset();
+    await loadHseStatus();
+    await loadActionPlan();
+    showToast("Questionário mensal enviado.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+refreshActionPlan?.addEventListener("click", loadActionPlan);
 
 checkinForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -632,6 +784,7 @@ checkinForm.addEventListener("submit", async (event) => {
     });
     renderDashboard(data.dashboard);
     renderPersonal(data.personal);
+    await loadActionPlan();
     checkinForm.reset();
     updateOutputs();
     showToast("Check-in salvo no servidor.");
@@ -699,6 +852,8 @@ async function boot() {
       await loadPersonalReport();
       await loadUsers();
       await loadFeedback();
+      await loadHseStatus();
+      await loadActionPlan();
       setRole(currentUser.role === "employee" ? "employee" : "manager", false);
     } else {
       authModal.classList.add("show");

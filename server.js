@@ -36,6 +36,69 @@ const securityHeaders = {
 
 const demoPassword = "demo123";
 
+const planCatalog = {
+  Essencial: {
+    name: "Essencial",
+    price: 14.9,
+    features: ["Check-in diário", "Relatório pessoal", "Indicadores básicos", "Exportação simples"],
+    limits: ["Sem IA de apoio", "Sem voz anônima", "Sem questionário mensal HSE", "Sem plano de ação RH"],
+    hasAssistant: false,
+    hasFeedback: false,
+    hasHse: false,
+    hasActionPlan: false,
+  },
+  Profissional: {
+    name: "Profissional",
+    price: 19.9,
+    features: ["IA de apoio", "Voz anônima", "Questionário mensal tipo HSE", "Plano de ação RH", "Risco por equipe"],
+    limits: ["Relatórios avançados sob demanda no Enterprise"],
+    hasAssistant: true,
+    hasFeedback: true,
+    hasHse: true,
+    hasActionPlan: true,
+  },
+  Enterprise: {
+    name: "Enterprise",
+    price: 39.9,
+    features: ["Tudo do Profissional", "Governança avançada", "Suporte de implantação", "Relatórios personalizados", "Múltiplas unidades"],
+    limits: [],
+    hasAssistant: true,
+    hasFeedback: true,
+    hasHse: true,
+    hasActionPlan: true,
+  },
+};
+
+const hseDimensions = {
+  demands: "Demandas",
+  control: "Controle",
+  support: "Apoio",
+  relationships: "Relacionamentos",
+  role: "Papel",
+  change: "Mudanças",
+};
+
+const hseQuestions = [
+  { id: "demands_1", dimension: "demands", text: "Minha carga de trabalho tem sido administrável." },
+  { id: "demands_2", dimension: "demands", text: "Tenho tempo suficiente para realizar minhas atividades com qualidade." },
+  { id: "demands_3", dimension: "demands", text: "As exigências do trabalho estão compatíveis com os recursos disponíveis." },
+  { id: "control_1", dimension: "control", text: "Tenho autonomia adequada para organizar a forma como realizo meu trabalho." },
+  { id: "control_2", dimension: "control", text: "Consigo participar de decisões que afetam minha rotina." },
+  { id: "control_3", dimension: "control", text: "Tenho clareza para priorizar tarefas quando há muitas demandas." },
+  { id: "support_1", dimension: "support", text: "Recebo apoio da liderança quando encontro dificuldades." },
+  { id: "support_2", dimension: "support", text: "Recebo apoio dos colegas quando preciso." },
+  { id: "support_3", dimension: "support", text: "A empresa oferece orientação suficiente para lidar com períodos de pressão." },
+  { id: "relationships_1", dimension: "relationships", text: "O ambiente de trabalho favorece respeito e colaboração." },
+  { id: "relationships_2", dimension: "relationships", text: "Conflitos são tratados de forma adequada." },
+  { id: "relationships_3", dimension: "relationships", text: "Sinto segurança para expressar preocupações sem receio de retaliação." },
+  { id: "role_1", dimension: "role", text: "Tenho clareza sobre minhas responsabilidades." },
+  { id: "role_2", dimension: "role", text: "Entendo como meu trabalho contribui para os objetivos da empresa." },
+  { id: "role_3", dimension: "role", text: "Recebo orientações claras sobre o que é esperado de mim." },
+  { id: "change_1", dimension: "change", text: "Mudanças na empresa são comunicadas com antecedência razoável." },
+  { id: "change_2", dimension: "change", text: "Entendo os motivos das mudanças que afetam minha rotina." },
+  { id: "change_3", dimension: "change", text: "Tenho espaço para tirar dúvidas durante mudanças importantes." },
+];
+
 function hashPassword(password, salt) {
   return crypto.createHash("sha256").update(`${salt}:${password}`).digest("hex");
 }
@@ -170,6 +233,18 @@ function createSeedData() {
     checkins: entries,
     consents: [],
     feedback: [],
+    hseResponses: [
+      {
+        id: "hse_demo_1",
+        companyId: "c_demo",
+        userId: "u_colab_ana",
+        team: "Atendimento",
+        month: "2026-05",
+        answers: Object.fromEntries(hseQuestions.map((question, index) => [question.id, index % 3 === 0 ? 2 : index % 3 === 1 ? 3 : 4])),
+        notes: "Carga alta em dias de fila cheia e pouca previsibilidade nas mudanças de escala.",
+        createdAt: "2026-05-22T12:00:00.000Z",
+      },
+    ],
     audit: [],
     createdAt: new Date().toISOString(),
   };
@@ -204,6 +279,128 @@ function publicUser(user) {
 
 function requireManager(user) {
   return user.role === "manager" || user.role === "admin";
+}
+
+function currentMonthKey(date = new Date()) {
+  return date.toISOString().slice(0, 7);
+}
+
+function companyPlan(db, user) {
+  const company = db.companies.find((item) => item.id === user.companyId) || {};
+  return planCatalog[company.plan] || planCatalog.Profissional;
+}
+
+function requireFeature(db, user, feature) {
+  const plan = companyPlan(db, user);
+  return Boolean(plan[feature]);
+}
+
+function hseDimensionScores(responses = []) {
+  const grouped = Object.fromEntries(Object.keys(hseDimensions).map((key) => [key, []]));
+  responses.forEach((response) => {
+    hseQuestions.forEach((question) => {
+      const value = Number(response.answers?.[question.id]);
+      if (value >= 1 && value <= 5) grouped[question.dimension].push(value);
+    });
+  });
+  return Object.entries(grouped).map(([key, values]) => {
+    const score = values.length ? average(values) : 0;
+    return {
+      key,
+      label: hseDimensions[key],
+      score,
+      percent: Math.round((score / 5) * 100),
+      risk: Math.max(0, Math.round(100 - (score / 5) * 100)),
+      count: values.length,
+    };
+  });
+}
+
+function buildHseSummary(db, user, month = currentMonthKey()) {
+  const responses = (db.hseResponses || []).filter((item) => item.companyId === user.companyId && item.month === month);
+  const dimensions = hseDimensionScores(responses);
+  const lowest = dimensions.slice().sort((a, b) => a.percent - b.percent).slice(0, 3);
+  return {
+    month,
+    count: responses.length,
+    dimensions,
+    lowest,
+    questions: hseQuestions,
+  };
+}
+
+function buildRhActionPlan(db, user) {
+  const dashboard = buildDashboard(db, user);
+  const hse = buildHseSummary(db, user);
+  const feedback = (db.feedback || []).filter((item) => item.companyId === user.companyId).slice(-40);
+  const urgentFeedback = feedback.filter((item) => item.sentiment === "urgente" || item.sentiment === "preocupacao");
+  const riskyTeams = dashboard.teams.filter((team) => !team.sampleProtected && (team.risk || 0) >= 32).sort((a, b) => b.risk - a.risk);
+  const weakDimensions = hse.lowest.filter((item) => item.count && item.percent < 70);
+  const actions = [];
+
+  riskyTeams.slice(0, 3).forEach((team) => {
+    actions.push({
+      priority: team.risk >= 45 ? "Alta" : "Média",
+      focus: `Equipe ${team.team}`,
+      evidence: `Risco agregado em ${team.risk}%, energia em ${team.energy}% e apoio em ${team.support}%.`,
+      action: team.risk >= 45 ? "Realizar escuta guiada com liderança e equipe em até 7 dias, revisar carga e suspender demandas não essenciais temporariamente." : "Monitorar tendência por 2 semanas, revisar prioridades e reforçar acordos de apoio com liderança.",
+      owner: "RH + liderança direta",
+      deadline: team.risk >= 45 ? "7 dias" : "14 dias",
+    });
+  });
+
+  weakDimensions.forEach((dimension) => {
+    const actionByDimension = {
+      demands: "Mapear picos de demanda, redistribuir tarefas e criar regra de priorização semanal.",
+      control: "Aumentar autonomia sobre ordem de execução e envolver a equipe em decisões de rotina.",
+      support: "Criar check-in de liderança semanal e pactuar canais de apoio para bloqueios.",
+      relationships: "Abrir roda de escuta segura, tratar conflitos recorrentes e reforçar conduta esperada.",
+      role: "Revisar papéis, responsabilidades e critérios de sucesso por função.",
+      change: "Comunicar mudanças com antecedência, explicar motivos e abrir espaço para dúvidas.",
+    };
+    actions.push({
+      priority: dimension.percent < 55 ? "Alta" : "Média",
+      focus: hseDimensions[dimension.key],
+      evidence: `Questionário mensal com ${dimension.percent}% de favorabilidade em ${dimension.label}.`,
+      action: actionByDimension[dimension.key],
+      owner: "RH",
+      deadline: dimension.percent < 55 ? "15 dias" : "30 dias",
+    });
+  });
+
+  if (urgentFeedback.length) {
+    actions.push({
+      priority: "Alta",
+      focus: "Voz anônima",
+      evidence: `${urgentFeedback.length} relato(s) recentes com preocupação ou urgência.`,
+      action: "Classificar relatos por tema, validar riscos com canais internos adequados e comunicar medidas sem expor autores.",
+      owner: "RH/Compliance",
+      deadline: "72 horas",
+    });
+  }
+
+  if (!actions.length) {
+    actions.push({
+      priority: "Baixa",
+      focus: "Manutenção preventiva",
+      evidence: "Indicadores sem alerta crítico no período atual.",
+      action: "Manter check-ins, reforçar participação no questionário mensal e compartilhar devolutiva coletiva com a equipe.",
+      owner: "RH",
+      deadline: "30 dias",
+    });
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    company: dashboard.company.name,
+    plan: companyPlan(db, user),
+    summary: {
+      risk: Math.round(dashboard.metrics.risk || 0),
+      hseResponses: hse.count,
+      feedbackItems: feedback.length,
+    },
+    actions: actions.slice(0, 8),
+  };
 }
 
 function createUser({ companyId, name, email, role, team, password }) {
@@ -318,6 +515,7 @@ function buildDashboard(db, user) {
 
   return {
     company,
+    plan: companyPlan(db, user),
     currentUser: publicUser(user),
     metrics: {
       mood,
@@ -558,8 +756,92 @@ async function routeApi(req, res) {
       return;
     }
 
+    if (req.method === "GET" && url.pathname === "/api/plans") {
+      const company = db.companies.find((item) => item.id === user.companyId);
+      sendJson(res, 200, { currentPlan: company?.plan || "Profissional", plans: planCatalog });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/company/plan") {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      const body = await readBody(req);
+      if (!planCatalog[body.plan]) {
+        sendJson(res, 400, { error: "Plano inválido" });
+        return;
+      }
+      const company = db.companies.find((item) => item.id === user.companyId);
+      company.plan = body.plan;
+      db.audit.push({ id: `audit_${Date.now()}`, action: "company.plan.updated", userId: user.id, companyId: user.companyId, plan: body.plan, date: new Date().toISOString() });
+      writeDb(db);
+      sendJson(res, 200, { company, plan: planCatalog[body.plan] });
+      return;
+    }
+
     if (req.method === "GET" && url.pathname === "/api/personal-report") {
       sendJson(res, 200, buildPersonalReport(db, user));
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/hse-status") {
+      if (!requireFeature(db, user, "hasHse")) {
+        sendJson(res, 403, { error: "Questionário mensal disponível nos planos Profissional e Enterprise." });
+        return;
+      }
+      const month = url.searchParams.get("month") || currentMonthKey();
+      const alreadyAnswered = (db.hseResponses || []).some((item) => item.companyId === user.companyId && item.userId === user.id && item.month === month);
+      const summary = requireManager(user) ? buildHseSummary(db, user, month) : null;
+      sendJson(res, 200, { month, alreadyAnswered, questions: hseQuestions, dimensions: hseDimensions, summary });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/hse-responses") {
+      if (!requireFeature(db, user, "hasHse")) {
+        sendJson(res, 403, { error: "Questionário mensal disponível nos planos Profissional e Enterprise." });
+        return;
+      }
+      const body = await readBody(req);
+      const month = body.month || currentMonthKey();
+      db.hseResponses = db.hseResponses || [];
+      if (db.hseResponses.some((item) => item.companyId === user.companyId && item.userId === user.id && item.month === month)) {
+        sendJson(res, 409, { error: "Você já respondeu o questionário deste mês." });
+        return;
+      }
+      const answers = body.answers || {};
+      const missing = hseQuestions.some((question) => Number(answers[question.id]) < 1 || Number(answers[question.id]) > 5);
+      if (missing) {
+        sendJson(res, 400, { error: "Responda todas as perguntas do questionário mensal." });
+        return;
+      }
+      const response = {
+        id: `hse_${Date.now()}`,
+        companyId: user.companyId,
+        userId: user.id,
+        team: user.team,
+        month,
+        answers: Object.fromEntries(hseQuestions.map((question) => [question.id, Number(answers[question.id])])),
+        notes: String(body.notes || ""),
+        createdAt: new Date().toISOString(),
+      };
+      db.hseResponses.push(response);
+      db.audit.push({ id: `audit_${Date.now()}`, action: "hse.response.created", userId: user.id, companyId: user.companyId, date: response.createdAt });
+      writeDb(db);
+      sendJson(res, 201, { response: { id: response.id, month: response.month, createdAt: response.createdAt }, summary: requireManager(user) ? buildHseSummary(db, user, month) : null });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/rh-action-plan") {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      if (!requireFeature(db, user, "hasActionPlan")) {
+        sendJson(res, 403, { error: "Plano de ação RH disponível nos planos Profissional e Enterprise." });
+        return;
+      }
+      sendJson(res, 200, buildRhActionPlan(db, user));
       return;
     }
 
@@ -591,6 +873,10 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "POST" && url.pathname === "/api/assistant") {
+      if (!requireFeature(db, user, "hasAssistant")) {
+        sendJson(res, 403, { error: "IA de apoio disponível nos planos Profissional e Enterprise." });
+        return;
+      }
       const body = await readBody(req);
       const reply = buildAssistantReply(String(body.message || ""));
       sendJson(res, 200, { reply });
@@ -598,6 +884,10 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "POST" && url.pathname === "/api/feedback") {
+      if (!requireFeature(db, user, "hasFeedback")) {
+        sendJson(res, 403, { error: "Voz anônima disponível nos planos Profissional e Enterprise." });
+        return;
+      }
       const body = await readBody(req);
       if (!String(body.message || "").trim()) {
         sendJson(res, 400, { error: "Escreva uma mensagem antes de enviar" });
@@ -622,6 +912,10 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "GET" && url.pathname === "/api/feedback") {
+      if (!requireFeature(db, user, "hasFeedback")) {
+        sendJson(res, 403, { error: "Voz anônima disponível nos planos Profissional e Enterprise." });
+        return;
+      }
       if (!requireManager(user)) {
         sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
         return;
@@ -674,6 +968,7 @@ async function routeApi(req, res) {
             checkins: db.checkins.filter((item) => item.companyId === user.companyId),
             consents: (db.consents || []).filter((item) => item.companyId === user.companyId),
             feedback: (db.feedback || []).filter((item) => item.companyId === user.companyId),
+            hseResponses: (db.hseResponses || []).filter((item) => item.companyId === user.companyId),
             audit: db.audit.filter((item) => item.companyId === user.companyId || item.userId === user.id),
           },
         },

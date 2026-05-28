@@ -777,6 +777,128 @@ textarea {
   background: var(--green-soft);
 }
 
+.hse-form {
+  max-width: none;
+}
+
+.hse-question-list,
+.hse-summary,
+.action-plan-board {
+  display: grid;
+  gap: 12px;
+}
+
+.hse-question {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.hse-question legend {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 850;
+  line-height: 1.4;
+}
+
+.hse-scale {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.hse-scale label {
+  display: grid;
+  place-items: center;
+}
+
+.hse-scale input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hse-scale span {
+  display: grid;
+  width: 100%;
+  min-height: 40px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.hse-scale input:checked + span {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.hse-count {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-weight: 900;
+}
+
+.hse-dimension {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.hse-dimension div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hse-dimension span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.action-plan-board {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.action-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.action-card.alta {
+  background: var(--rose-soft);
+}
+
+.action-card.media {
+  background: var(--amber-soft);
+}
+
+.action-card p {
+  margin: 0;
+}
+
+.action-card small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
 .chat-panel {
   display: grid;
   gap: 12px;
@@ -1035,6 +1157,7 @@ textarea {
   .governance-grid,
   .admin-grid,
   .feedback-grid,
+  .action-plan-board,
   .intervention-board {
     grid-template-columns: 1fr;
   }
@@ -1212,7 +1335,8 @@ textarea {
   .report-grid,
   .sales-grid,
   .feedback-grid,
-  .admin-grid {
+  .admin-grid,
+  .action-plan-board {
     gap: 12px;
   }
 
@@ -1241,6 +1365,19 @@ textarea {
   .emotion-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 9px;
+  }
+
+  .hse-scale {
+    gap: 6px;
+  }
+
+  .hse-scale span {
+    min-height: 44px;
+  }
+
+  .hse-dimension div:first-child {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .emotion-option {
