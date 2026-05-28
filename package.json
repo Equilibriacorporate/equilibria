@@ -1,0 +1,21 @@
+{
+  "name": "equilibria",
+  "version": "1.0.0",
+  "description": "Sistema de gestão emocional corporativa com backend local, API e dashboard.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "reset-demo": "node server.js --reset-demo"
+  },
+  "keywords": [
+    "saude-emocional",
+    "burnout",
+    "rh",
+    "wellbeing",
+    "corporativo"
+  ],
+  "author": "",
+  "license": "UNLICENSED"
+}

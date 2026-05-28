@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Equilibria, sistema de gestão emocional corporativa para check-ins, relatórios, alertas e prevenção de burnout."
+    />
+    <title>Equilibria | Gestão emocional corporativa</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegação principal">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div>
+            <strong>Equilibria</strong>
+            <small>Gestão emocional corporativa</small>
+          </div>
+        </div>
+
+        <div class="role-switcher" aria-label="Perfil de demonstração">
+          <button class="role-button active" data-role="employee" type="button">Colaborador</button>
+          <button class="role-button" data-role="manager" type="button">Gestor/RH</button>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-item active" data-section="dashboard" type="button">
+            <span aria-hidden="true">⌂</span>
+            Visão geral
+          </button>
+          <button class="nav-item" data-section="checkin" type="button">
+            <span aria-hidden="true">◌</span>
+            Check-in
+          </button>
+          <button class="nav-item" data-section="personal" type="button">
+            <span aria-hidden="true">◎</span>
+            Meu relatório
+          </button>
+          <button class="nav-item" data-section="teams" type="button">
+            <span aria-hidden="true">◇</span>
+            Equipes
+          </button>
+          <button class="nav-item" data-section="interventions" type="button">
+            <span aria-hidden="true">!</span>
+            Intervenções
+          </button>
+          <button class="nav-item" data-section="assistant" type="button">
+            <span aria-hidden="true">✦</span>
+            IA de apoio
+          </button>
+          <button class="nav-item" data-section="commercial" type="button">
+            <span aria-hidden="true">$</span>
+            Venda
+          </button>
+          <button class="nav-item" data-section="governance" type="button">
+            <span aria-hidden="true">§</span>
+            Governança
+          </button>
+          <button class="nav-item" data-section="admin" type="button">
+            <span aria-hidden="true">+</span>
+            Administração
+          </button>
+        </nav>
+
+        <div class="privacy-note">
+          <strong>Privacidade por desenho</strong>
+          <p>Dados individuais aparecem para o colaborador. RH e liderança veem tendências agregadas e anonimizadas.</p>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">MVP vendável</p>
+            <h1>Plataforma de prevenção emocional para empresas</h1>
+          </div>
+          <div class="account-panel">
+            <span id="currentUser">Conectando...</span>
+            <div class="top-actions">
+              <button class="ghost-button" id="exportReport" type="button">Exportar relatório</button>
+              <button class="ghost-button" id="logoutButton" type="button">Sair</button>
+              <button class="primary-button" data-open-checkin type="button">Registrar agora</button>
+            </div>
+          </div>
+        </header>
+
+        <section class="hero-band">
+          <div class="hero-copy">
+            <p class="eyebrow">Radar preventivo</p>
+            <h2>Check-ins diários viram inteligência de cuidado, gestão e prevenção.</h2>
+            <p>
+              O Equilibria acompanha humor, energia, pressão percebida e apoio recebido. O colaborador ganha clareza pessoal; a empresa enxerga sinais coletivos antes que virem afastamento, turnover ou queda de desempenho.
+            </p>
+            <div class="hero-actions">
+              <button class="primary-button" data-open-checkin type="button">Fazer check-in</button>
+              <button class="ghost-button" data-section-shortcut="commercial" type="button">Simular preço</button>
+            </div>
+          </div>
+          <div class="pulse-visual" aria-label="Visualização do pulso emocional da equipe">
+            <canvas id="pulseCanvas" width="560" height="300"></canvas>
+            <div class="pulse-caption">
+              <strong>Índice emocional</strong>
+              <span id="pulseScore">76%</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="workspace-section active" id="dashboard" aria-labelledby="dashboardTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Hoje</p>
+              <h2 id="dashboardTitle">Painel executivo</h2>
+            </div>
+            <span class="status-pill stable" id="riskSummary">Risco moderado controlado</span>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span>Humor médio</span>
+              <strong id="avgMood">7,4</strong>
+              <small id="moodDelta">+0,6 vs. semana anterior</small>
+            </article>
+            <article class="metric-card">
+              <span>Energia média</span>
+              <strong id="avgEnergy">68%</strong>
+              <small>queda leve no fim do dia</small>
+            </article>
+            <article class="metric-card warning">
+              <span>Risco de burnout</span>
+              <strong id="burnoutRisk">22%</strong>
+              <small id="riskDetail">3 sinais exigem atenção</small>
+            </article>
+            <article class="metric-card">
+              <span>Adesão ao check-in</span>
+              <strong id="checkinRate">84%</strong>
+              <small id="checkinDetail">118 respostas no mês</small>
+            </article>
+          </div>
+
+          <div class="two-column">
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Tendência emocional</h3>
+                <span>Últimos 14 registros</span>
+              </div>
+              <canvas id="trendCanvas" width="780" height="300"></canvas>
+            </article>
+
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Alertas preventivos</h3>
+                <span>Priorizados por impacto</span>
+              </div>
+              <div class="alert-list" id="alertList"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="workspace-section" id="checkin" aria-labelledby="checkinTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Rotina diária</p>
+              <h2 id="checkinTitle">Como você está hoje?</h2>
+            </div>
+            <span class="status-pill private">Resposta privada</span>
+          </div>
+
+          <form class="checkin-form" id="checkinForm">
+            <fieldset>
+              <legend>Momento do registro</legend>
+              <div class="segmented">
+                <label><input checked name="moment" type="radio" value="Entrada" /> Entrada</label>
+                <label><input name="moment" type="radio" value="Saída" /> Saída</label>
+              </div>
+            </fieldset>
+
+            <label class="text-field compact">
+              Equipe
+              <select name="team" id="teamInput">
+                <option>Atendimento</option>
+                <option>Comercial</option>
+                <option>Produto</option>
+                <option>Operações</option>
+                <option>Financeiro</option>
+              </select>
+            </label>
+
+            <div class="emotion-grid" role="radiogroup" aria-label="Humor">
+              <label class="emotion-option">
+                <input name="mood" type="radio" value="9" />
+                <span>😊</span>
+                Bem
+              </label>
+              <label class="emotion-option">
+                <input checked name="mood" type="radio" value="7" />
+                <span>🙂</span>
+                Estável
+              </label>
+              <label class="emotion-option">
+                <input name="mood" type="radio" value="5" />
+                <span>😐</span>
+                Neutro
+              </label>
+              <label class="emotion-option">
+                <input name="mood" type="radio" value="3" />
+                <span>😟</span>
+                Pressionado
+              </label>
+              <label class="emotion-option">
+                <input name="mood" type="radio" value="1" />
+                <span>😣</span>
+                Esgotado
+              </label>
+            </div>
+
+            <div class="slider-stack">
+              <label>
+                Energia
+                <input id="energyInput" max="10" min="1" name="energy" type="range" value="7" />
+                <output for="energyInput" id="energyOutput">7</output>
+              </label>
+              <label>
+                Pressão percebida
+                <input id="pressureInput" max="10" min="1" name="pressure" type="range" value="4" />
+                <output for="pressureInput" id="pressureOutput">4</output>
+              </label>
+              <label>
+                Apoio recebido
+                <input id="supportInput" max="10" min="1" name="support" type="range" value="8" />
+                <output for="supportInput" id="supportOutput">8</output>
+              </label>
+            </div>
+
+            <label class="text-field">
+              Quer registrar algo importante?
+              <textarea name="note" placeholder="Opcional. Ex.: reunião tensa, excesso de demanda, bom apoio da liderança..."></textarea>
+            </label>
+
+            <div class="consent-line">
+              <label>
+                <input checked name="privacy" required type="checkbox" />
+                Entendo que meu relato individual é privado e usado para meu relatório pessoal. A empresa recebe apenas dados agregados.
+              </label>
+            </div>
+
+            <button class="primary-button wide" type="submit">Salvar check-in</button>
+          </form>
+        </section>
+
+        <section class="workspace-section" id="personal" aria-labelledby="personalTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Individual</p>
+              <h2 id="personalTitle">Meu relatório emocional</h2>
+            </div>
+            <span class="status-pill private">Somente colaborador</span>
+          </div>
+
+          <div class="report-grid">
+            <article class="panel">
+              <h3>Leitura do mês</h3>
+              <ul id="personalReport"></ul>
+            </article>
+            <article class="panel">
+              <h3>Plano de autocuidado</h3>
+              <div class="care-plan" id="carePlan"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="workspace-section" id="teams" aria-labelledby="teamTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Leitura coletiva</p>
+              <h2 id="teamTitle">Saúde emocional das equipes</h2>
+            </div>
+            <span class="status-pill private">Dados anonimizados</span>
+          </div>
+
+          <div class="team-table" id="teamTable"></div>
+        </section>
+
+        <section class="workspace-section" id="interventions" aria-labelledby="interventionTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Ação preventiva</p>
+              <h2 id="interventionTitle">Plano de intervenções</h2>
+            </div>
+            <span class="status-pill stable">Recomendações não clínicas</span>
+          </div>
+
+          <div class="intervention-board" id="interventionBoard"></div>
+        </section>
+
+        <section class="workspace-section" id="assistant" aria-labelledby="assistantTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Apoio interno</p>
+              <h2 id="assistantTitle">IA de suporte emocional</h2>
+            </div>
+            <span class="status-pill stable">Não substitui profissional de saúde</span>
+          </div>
+
+          <div class="assistant-layout">
+            <article class="chat-panel" id="chatPanel" aria-live="polite"></article>
+            <form class="assistant-form" id="assistantForm">
+              <input aria-label="Mensagem para IA" name="message" placeholder="Conte brevemente como está se sentindo..." />
+              <button class="primary-button" type="submit">Enviar</button>
+            </form>
+          </div>
+        </section>
+
+        <section class="workspace-section" id="commercial" aria-labelledby="pricingTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Oferta comercial</p>
+              <h2 id="pricingTitle">Planos, proposta e receita</h2>
+            </div>
+            <span class="status-pill stable">Pronto para apresentação</span>
+          </div>
+
+          <div class="pricing-grid">
+            <article class="pricing-card">
+              <span>Essencial</span>
+              <strong>R$ 14,90</strong>
+              <small>por colaborador/mês</small>
+              <ul>
+                <li>Check-in e check-out emocional</li>
+                <li>Relatório pessoal mensal</li>
+                <li>Humor médio por equipe</li>
+                <li>Alertas preventivos básicos</li>
+              </ul>
+              <button class="ghost-button" data-plan="Essencial" type="button">Simular</button>
+            </article>
+
+            <article class="pricing-card featured">
+              <span>Profissional</span>
+              <strong>R$ 19,90</strong>
+              <small>por colaborador/mês</small>
+              <ul>
+                <li>Dashboard de RH e liderança</li>
+                <li>IA de apoio interno</li>
+                <li>Risco de burnout por equipe</li>
+                <li>Recomendações de intervenção</li>
+              </ul>
+              <button class="primary-button" data-plan="Profissional" type="button">Simular</button>
+            </article>
+
+            <article class="pricing-card">
+              <span>Enterprise</span>
+              <strong>R$ 39,90+</strong>
+              <small>por colaborador/mês</small>
+              <ul>
+                <li>Integrações e API</li>
+                <li>Relatórios executivos personalizados</li>
+                <li>Governança LGPD avançada</li>
+                <li>Onboarding e suporte dedicado</li>
+              </ul>
+              <button class="ghost-button" data-plan="Enterprise" type="button">Simular</button>
+            </article>
+          </div>
+
+          <article class="pricing-simulator">
+            <div>
+              <p class="eyebrow">Simulador</p>
+              <h3>Receita mensal estimada</h3>
+              <p>Use como referência para propostas, pilotos e negociação com empresas.</p>
+            </div>
+            <div class="simulator-controls">
+              <label>
+                Colaboradores
+                <input id="employeeCount" max="2000" min="10" step="10" type="range" value="100" />
+                <output id="employeeOutput">100</output>
+              </label>
+              <label>
+                Plano
+                <select id="planSelect">
+                  <option value="14.9">Essencial</option>
+                  <option selected value="19.9">Profissional</option>
+                  <option value="39.9">Enterprise</option>
+                </select>
+              </label>
+            </div>
+            <div class="simulator-result">
+              <span>Mensalidade estimada</span>
+              <strong id="monthlyRevenue">R$ 1.990</strong>
+              <small>mínimo recomendado: R$ 299/mês</small>
+            </div>
+          </article>
+
+          <div class="sales-grid">
+            <article class="panel">
+              <h3>Pitch de venda</h3>
+              <p>
+                O Equilibria ajuda empresas a acompanhar o clima emocional, detectar risco coletivo de burnout e agir antes que problemas humanos virem crises de saúde, produtividade e retenção.
+              </p>
+            </article>
+            <article class="panel">
+              <h3>Próximos passos comerciais</h3>
+              <ol class="clean-list">
+                <li>Oferecer piloto de 30 dias para 1 a 3 equipes.</li>
+                <li>Medir adesão, sinais de risco e qualidade dos relatórios.</li>
+                <li>Converter para contrato anual com implantação assistida.</li>
+              </ol>
+            </article>
+          </div>
+        </section>
+
+        <section class="workspace-section" id="governance" aria-labelledby="governanceTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Confiança</p>
+              <h2 id="governanceTitle">Governança, privacidade e limites</h2>
+            </div>
+            <span class="status-pill private">LGPD desde o desenho</span>
+          </div>
+
+          <div class="governance-grid">
+            <article class="panel">
+              <h3>O que a empresa vê</h3>
+              <ul>
+                <li>Tendências coletivas por equipe.</li>
+                <li>Risco agregado de burnout e sobrecarga.</li>
+                <li>Alertas preventivos sem exposição individual.</li>
+                <li>Recomendações organizacionais de intervenção.</li>
+              </ul>
+            </article>
+            <article class="panel">
+              <h3>O que fica privado</h3>
+              <ul>
+                <li>Comentários individuais do colaborador.</li>
+                <li>Histórico pessoal detalhado.</li>
+                <li>Conversas com IA de apoio.</li>
+                <li>Relatório pessoal sem consentimento explícito.</li>
+              </ul>
+            </article>
+            <article class="panel">
+              <h3>Limite clínico</h3>
+              <p>
+                A plataforma não diagnostica doenças e não substitui psicólogos, médicos ou serviços de emergência. Ela orienta, registra sinais e recomenda caminhos de apoio.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="workspace-section" id="admin" aria-labelledby="adminTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Operação</p>
+              <h2 id="adminTitle">Empresa e usuários</h2>
+            </div>
+            <span class="status-pill stable">Área de RH/Admin</span>
+          </div>
+
+          <div class="admin-grid">
+            <article class="panel">
+              <h3>Cadastrar colaborador</h3>
+              <form class="admin-form" id="userForm">
+                <label>Nome <input name="name" required placeholder="Nome do colaborador" /></label>
+                <label>E-mail <input name="email" required type="email" placeholder="email@empresa.com" /></label>
+                <label>Senha inicial <input name="password" minlength="6" required type="password" value="123456" /></label>
+                <label>Equipe <input name="team" required placeholder="Atendimento" /></label>
+                <label>
+                  Perfil
+                  <select name="role">
+                    <option value="employee">Colaborador</option>
+                    <option value="manager">RH/Gestor</option>
+                    <option value="admin">Administrador</option>
+                  </select>
+                </label>
+                <button class="primary-button wide" type="submit">Criar usuário</button>
+              </form>
+            </article>
+
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Usuários da empresa</h3>
+                <button class="ghost-button" id="backupButton" type="button">Backup</button>
+              </div>
+              <div class="user-list" id="userList"></div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <div class="auth-modal" id="authModal" aria-labelledby="authTitle" role="dialog">
+      <div class="auth-card">
+        <div>
+          <p class="eyebrow">Acesso</p>
+          <h2 id="authTitle">Entrar no Equilibria</h2>
+          <p>Use uma conta existente ou crie uma empresa para começar uma operação real.</p>
+        </div>
+
+        <form class="auth-form active" id="loginForm">
+          <label>E-mail <input name="email" required type="email" value="colaborador@equilibria.demo" /></label>
+          <label>Senha <input name="password" required type="password" value="demo123" /></label>
+          <button class="primary-button wide" type="submit">Entrar</button>
+          <button class="ghost-button wide" data-auth-mode="register" type="button">Criar empresa</button>
+        </form>
+
+        <form class="auth-form" id="registerForm">
+          <label>Empresa <input name="companyName" required placeholder="Nome da empresa" /></label>
+          <label>Seu nome <input name="name" required placeholder="Responsável" /></label>
+          <label>E-mail <input name="email" required type="email" placeholder="voce@empresa.com" /></label>
+          <label>Senha <input name="password" minlength="6" required type="password" /></label>
+          <label>Equipes iniciais <input name="teams" value="Geral,Atendimento,Comercial,Operações" /></label>
+          <button class="primary-button wide" type="submit">Criar e entrar</button>
+          <button class="ghost-button wide" data-auth-mode="login" type="button">Voltar ao login</button>
+        </form>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

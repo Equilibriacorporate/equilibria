@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: equilibria
+    runtime: node
+    plan: starter
+    buildCommand: ""
+    startCommand: "npm start"
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: HOST
+        value: 0.0.0.0
+      - key: SESSION_TTL_MS
+        value: 28800000
+      - key: MIN_TEAM_SAMPLE
+        value: 3
+    disk:
+      name: equilibria-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
