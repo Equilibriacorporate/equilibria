@@ -519,12 +519,18 @@ p {
   }
 
   h1 {
-    font-size: clamp(2.6rem, 14vw, 4.2rem);
+    font-size: clamp(2.35rem, 11vw, 3.15rem);
+    line-height: 1.02;
   }
 
   .hero {
     min-height: auto;
-    padding-top: 38px;
+    padding-top: 34px;
+  }
+
+  .hero-copy > p:not(.eyebrow) {
+    font-size: 1rem;
+    line-height: 1.6;
   }
 
   .hero-actions {
@@ -547,7 +553,7 @@ p {
   }
 
   .metric-large strong {
-    font-size: 4.1rem;
+    font-size: 3.55rem;
   }
 
   .preview-grid {

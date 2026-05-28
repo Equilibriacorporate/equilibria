@@ -39,6 +39,7 @@ function showToast(message) {
 function switchSection(sectionId) {
   sections.forEach((section) => section.classList.toggle("active", section.id === sectionId));
   navButtons.forEach((button) => button.classList.toggle("active", button.dataset.section === sectionId));
+  document.body.dataset.activeSection = sectionId;
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
