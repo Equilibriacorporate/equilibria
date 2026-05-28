@@ -30,7 +30,7 @@ const securityHeaders = {
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-  "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+  "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
 };
 
 const demoPassword = "demo123";
@@ -168,6 +168,7 @@ function createSeedData() {
     users,
     checkins: entries,
     consents: [],
+    feedback: [],
     audit: [],
     createdAt: new Date().toISOString(),
   };
@@ -590,16 +591,54 @@ async function routeApi(req, res) {
 
     if (req.method === "POST" && url.pathname === "/api/assistant") {
       const body = await readBody(req);
-      const text = String(body.message || "").toLowerCase();
-      let reply = "Obrigado por compartilhar. Vou tratar isso como um sinal privado seu. Registrar o contexto ajuda seu relatório pessoal a encontrar padrões sem expor detalhes à gestão.";
-      if (text.includes("ansioso") || text.includes("ansiedade") || text.includes("press")) {
-        reply = "Entendi. Vamos reduzir a urgência do momento: respire por um minuto, escolha uma próxima tarefa pequena e registre o contexto. Se isso estiver recorrente, vale acionar apoio humano.";
-      } else if (text.includes("cans") || text.includes("esgot") || text.includes("burnout")) {
-        reply = "Sinal importante. Quando cansaço vira padrão, o melhor caminho é diminuir carga, falar com alguém de confiança e buscar apoio profissional quando necessário.";
-      } else if (text.includes("triste") || text.includes("mal")) {
-        reply = "Obrigado por confiar isso aqui. Você não precisa transformar tudo em solução agora. Registre o dia, procure uma pessoa segura e, se houver sofrimento intenso, busque suporte profissional.";
-      }
+      const reply = buildAssistantReply(String(body.message || ""));
       sendJson(res, 200, { reply });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/feedback") {
+      const body = await readBody(req);
+      if (!String(body.message || "").trim()) {
+        sendJson(res, 400, { error: "Escreva uma mensagem antes de enviar" });
+        return;
+      }
+      const feedback = {
+        id: `feedback_${Date.now()}`,
+        companyId: user.companyId,
+        team: body.team ? String(body.team) : user.team,
+        category: body.category || "jornada",
+        sentiment: body.sentiment || "neutro",
+        message: String(body.message).trim(),
+        anonymous: true,
+        createdAt: new Date().toISOString(),
+      };
+      db.feedback = db.feedback || [];
+      db.feedback.push(feedback);
+      db.audit.push({ id: `audit_${Date.now()}`, action: "feedback.created", companyId: user.companyId, date: feedback.createdAt });
+      writeDb(db);
+      sendJson(res, 201, { feedback: { ...feedback, message: "registrado anonimamente" } });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/feedback") {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      const items = (db.feedback || [])
+        .filter((item) => item.companyId === user.companyId)
+        .slice(-50)
+        .reverse()
+        .map((item) => ({
+          id: item.id,
+          team: item.team,
+          category: item.category,
+          sentiment: item.sentiment,
+          message: item.message,
+          anonymous: true,
+          createdAt: item.createdAt,
+        }));
+      sendJson(res, 200, { feedback: items });
       return;
     }
 
@@ -633,6 +672,7 @@ async function routeApi(req, res) {
             users: db.users.filter((item) => item.companyId === user.companyId).map(publicUser),
             checkins: db.checkins.filter((item) => item.companyId === user.companyId),
             consents: (db.consents || []).filter((item) => item.companyId === user.companyId),
+            feedback: (db.feedback || []).filter((item) => item.companyId === user.companyId),
             audit: db.audit.filter((item) => item.companyId === user.companyId || item.userId === user.id),
           },
         },
@@ -644,6 +684,61 @@ async function routeApi(req, res) {
   } catch (error) {
     sendJson(res, 500, { error: error.message || "Erro interno" });
   }
+}
+
+function buildAssistantReply(message) {
+  const raw = String(message || "").trim();
+  const text = raw.toLowerCase();
+  const has = (...words) => words.some((word) => text.includes(word));
+  const wantsAction = has("o que faço", "como faço", "me ajuda", "ajuda", "orienta", "orientação");
+
+  if (!raw) return "Estou aqui. Me conte em uma ou duas frases o que está acontecendo para eu te responder com mais precisão.";
+
+  if (has("assédio", "humilha", "humilh", "ameaça", "ameaçado", "perseguição", "perseguido")) {
+    return [
+      "O que você descreve merece cuidado e registro, não deve ser tratado como algo normal da rotina.",
+      "Se puder, anote datas, pessoas envolvidas, contexto e impactos. Evite ficar sozinho com essa situação: procure um canal formal de RH, compliance ou uma liderança segura.",
+      "Se houver risco imediato à sua segurança, priorize sair da situação e buscar ajuda de uma pessoa ou serviço de emergência.",
+    ].join("\n\n");
+  }
+
+  if (has("cans", "exaust", "esgot", "burnout", "sem energia", "não aguento")) {
+    return [
+      "Parece que seu corpo e sua mente estão pedindo redução de carga, não só mais força de vontade.",
+      "Para hoje, tente escolher uma próxima tarefa pequena e negociar o que pode sair da lista. Se isso vem se repetindo, o melhor passo é transformar em conversa: carga, prazo, prioridade e apoio.",
+      wantsAction ? "Uma frase possível para abrir essa conversa: \"Eu preciso revisar prioridades porque minha energia está baixa de forma recorrente e isso pode afetar a entrega\"." : "Se quiser, me diga o que mais pesa: volume de tarefas, conflito, cobrança, falta de pausa ou falta de apoio.",
+    ].join("\n\n");
+  }
+
+  if (has("ansios", "pânico", "panico", "pressão", "pressionado", "cobrança", "cobranca")) {
+    return [
+      "Entendi. Quando a pressão sobe, a mente costuma tentar resolver tudo ao mesmo tempo, e isso aumenta a sensação de ameaça.",
+      "Agora, separe o que é urgente do que é apenas barulhento. Escolha uma ação de 10 minutos, não o dia inteiro. Depois registre o gatilho no check-in para vermos se isso é um padrão da jornada.",
+      "Se vier com falta de ar intensa, dor no peito, sensação de descontrole ou risco de se machucar, procure ajuda imediata.",
+    ].join("\n\n");
+  }
+
+  if (has("triste", "chorei", "choro", "desanim", "sozinho", "sozinha", "mal")) {
+    return [
+      "Sinto muito que o dia esteja vindo desse jeito. Não vou tentar transformar isso em frase pronta.",
+      "O mais importante agora é você não atravessar isso isolado. Procure alguém confiável, reduza decisões difíceis por hoje e registre o que aconteceu com o máximo de honestidade possível.",
+      "Se essa tristeza estiver frequente, intensa ou vier com pensamentos de se ferir, busque apoio profissional ou um serviço de emergência imediatamente.",
+    ].join("\n\n");
+  }
+
+  if (has("chefe", "lider", "líder", "gestor", "gestora", "coordenador")) {
+    return [
+      "Parece que existe um ponto de relação com liderança, e isso costuma afetar muito a segurança emocional no trabalho.",
+      "Tente separar fatos observáveis de interpretações: o que foi dito, quando, qual impacto teve e o que você precisa que mude. Isso ajuda a conversa ficar mais objetiva e menos desgastante.",
+      "Se você não se sente seguro para falar diretamente, use o canal anônimo ou procure RH/compliance.",
+    ].join("\n\n");
+  }
+
+  return [
+    "Obrigado por me contar. Pelo que você trouxe, eu olharia para três coisas: o que aconteceu, como isso te afetou e que apoio você precisa agora.",
+    "Se for algo pontual, registre o contexto e observe se passa. Se for repetido, vale transformar em dado: frequência, gatilho e impacto na sua energia.",
+    "Quer me contar um pouco mais sobre o que aconteceu antes desse sentimento aparecer?",
+  ].join("\n\n");
 }
 
 if (globalThis.process?.argv?.includes("--reset-demo")) {

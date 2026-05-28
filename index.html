@@ -8,6 +8,9 @@
       content="Equilibria, sistema de gestão emocional corporativa para check-ins, relatórios, alertas e prevenção de burnout."
     />
     <title>Equilibria | Gestão emocional corporativa</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -54,6 +57,10 @@
           <button class="nav-item" data-section="assistant" type="button">
             <span aria-hidden="true">✦</span>
             IA de apoio
+          </button>
+          <button class="nav-item" data-section="feedback" type="button">
+            <span aria-hidden="true">◐</span>
+            Voz anônima
           </button>
           <button class="nav-item" data-section="commercial" type="button">
             <span aria-hidden="true">$</span>
@@ -314,6 +321,57 @@
               <input aria-label="Mensagem para IA" name="message" placeholder="Conte brevemente como está se sentindo..." />
               <button class="primary-button" type="submit">Enviar</button>
             </form>
+          </div>
+        </section>
+
+        <section class="workspace-section" id="feedback" aria-labelledby="feedbackTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Escuta segura</p>
+              <h2 id="feedbackTitle">Canal anônimo de jornada</h2>
+            </div>
+            <span class="status-pill private">Sem identificação pessoal</span>
+          </div>
+
+          <div class="feedback-grid">
+            <article class="panel soft-panel">
+              <h3>Registrar relato anônimo</h3>
+              <p>Use este espaço para reclamações, sugestões, riscos percebidos ou orientações sobre a jornada de trabalho.</p>
+              <form class="feedback-form" id="feedbackForm">
+                <label>
+                  Tipo
+                  <select name="category">
+                    <option value="jornada">Jornada e carga</option>
+                    <option value="lideranca">Liderança</option>
+                    <option value="processo">Processos</option>
+                    <option value="ambiente">Ambiente e relações</option>
+                    <option value="sugestao">Sugestão de melhoria</option>
+                  </select>
+                </label>
+                <label>
+                  Tom do relato
+                  <select name="sentiment">
+                    <option value="neutro">Neutro</option>
+                    <option value="preocupacao">Preocupação</option>
+                    <option value="urgente">Urgente</option>
+                    <option value="positivo">Positivo</option>
+                  </select>
+                </label>
+                <label>
+                  Relato
+                  <textarea name="message" required placeholder="Escreva sem colocar nomes se quiser preservar a privacidade. Ex.: escala cansativa, ruído na comunicação, falta de clareza, sugestão de melhoria..."></textarea>
+                </label>
+                <button class="primary-button wide" type="submit">Enviar anonimamente</button>
+              </form>
+            </article>
+
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Painel de escuta</h3>
+                <span>Visão RH/Gestor</span>
+              </div>
+              <div class="anonymous-list" id="anonymousList"></div>
+            </article>
           </div>
         </section>
 

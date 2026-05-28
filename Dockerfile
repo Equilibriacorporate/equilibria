@@ -1,13 +1,21 @@
-from node:22-alpine
+FROM node:22-alpine
 
-workdir /app
+WORKDIR /app
 
-copy . .
+COPY package.json ./
+COPY server.js ./
+COPY index.html ./
+COPY styles.css ./
+COPY app.js ./
+COPY README.md ./
+COPY PROPOSTA_COMERCIAL.md ./
+COPY ROADMAP.md ./
+COPY PRODUCAO.md ./
 
-run mkdir -p data
+RUN mkdir -p data
 
-env port=5290
-env host=0.0.0.0
-expose 5290
+ENV PORT=5290
+ENV HOST=0.0.0.0
+EXPOSE 5290
 
-cmd ["node","server.js"]
+CMD ["node", "server.js"]

@@ -27,6 +27,8 @@ const loginForm = document.querySelector("#loginForm");
 const registerForm = document.querySelector("#registerForm");
 const userForm = document.querySelector("#userForm");
 const userList = document.querySelector("#userList");
+const feedbackForm = document.querySelector("#feedbackForm");
+const anonymousList = document.querySelector("#anonymousList");
 
 function showToast(message) {
   toast.textContent = message;
@@ -105,6 +107,7 @@ async function loginWithCredentials(email, password) {
   await loadDashboard();
   await loadPersonalReport();
   await loadUsers();
+  await loadFeedback();
   setRole(currentUser.role === "employee" ? "employee" : "manager", false);
   showToast(`Conectado como ${currentUser.name}.`);
 }
@@ -128,6 +131,7 @@ async function registerCompany(formData) {
   await loadDashboard();
   await loadPersonalReport();
   await loadUsers();
+  await loadFeedback();
   setRole("manager", false);
   showToast("Empresa criada. Você entrou como administrador.");
 }
@@ -168,6 +172,67 @@ async function loadUsers() {
   } catch (error) {
     userList.innerHTML = `<p>${error.message}</p>`;
   }
+}
+
+async function loadFeedback() {
+  if (!currentUser || currentUser.role === "employee") {
+    anonymousList.innerHTML = "<p>Relatos enviados aqui aparecem para RH/Gestor sem identificação pessoal.</p>";
+    return;
+  }
+  try {
+    const data = await request("/api/feedback");
+    renderFeedback(data.feedback);
+  } catch (error) {
+    anonymousList.innerHTML = `<p>${error.message}</p>`;
+  }
+}
+
+function renderFeedback(items) {
+  if (!items.length) {
+    anonymousList.innerHTML = "<p>Nenhum relato anônimo registrado ainda.</p>";
+    return;
+  }
+  anonymousList.innerHTML = items
+    .map(
+      (item) => `
+        <article class="anonymous-item ${item.sentiment}">
+          <div>
+            <strong>${labelCategory(item.category)}</strong>
+            <span>${item.team || "Equipe não informada"} · ${labelSentiment(item.sentiment)}</span>
+          </div>
+          <p>${escapeHtml(item.message)}</p>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function labelCategory(category) {
+  return {
+    jornada: "Jornada e carga",
+    lideranca: "Liderança",
+    processo: "Processos",
+    ambiente: "Ambiente e relações",
+    sugestao: "Sugestão de melhoria",
+  }[category] || "Jornada";
+}
+
+function labelSentiment(sentiment) {
+  return {
+    neutro: "Neutro",
+    preocupacao: "Preocupação",
+    urgente: "Urgente",
+    positivo: "Positivo",
+  }[sentiment] || "Neutro";
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function renderUsers(users) {
@@ -519,6 +584,26 @@ document.querySelectorAll('input[type="range"]').forEach((input) => {
   });
 });
 
+feedbackForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(feedbackForm);
+  try {
+    await request("/api/feedback", {
+      method: "POST",
+      body: JSON.stringify({
+        category: formData.get("category"),
+        sentiment: formData.get("sentiment"),
+        message: formData.get("message"),
+      }),
+    });
+    feedbackForm.reset();
+    await loadFeedback();
+    showToast("Relato anônimo enviado com segurança.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
 planSelect.addEventListener("change", updatePricing);
 
 checkinForm.addEventListener("submit", async (event) => {
@@ -612,6 +697,7 @@ async function boot() {
       await loadDashboard();
       await loadPersonalReport();
       await loadUsers();
+      await loadFeedback();
       setRole(currentUser.role === "employee" ? "employee" : "manager", false);
     } else {
       authModal.classList.add("show");
