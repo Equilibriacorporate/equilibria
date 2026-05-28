@@ -9,6 +9,9 @@ COPY styles.css ./
 COPY app.js ./
 COPY venda.html ./
 COPY venda.css ./
+COPY politica-privacidade.html ./
+COPY termos-uso.html ./
+COPY legal.css ./
 COPY Equilibria-apresentacao-comercial.pdf ./
 COPY README.md ./
 COPY PROPOSTA_COMERCIAL.md ./
