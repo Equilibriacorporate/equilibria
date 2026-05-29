@@ -872,8 +872,27 @@ async function routeApi(req, res) {
         sendJson(res, 401, { error: "Credenciais inválidas" });
         return;
       }
+      if (body.acceptedLegal !== true) {
+        sendJson(res, 400, { error: "Aceite os Termos de Uso, a Politica de Privacidade e o consentimento para continuar." });
+        return;
+      }
       loginAttempts.delete(rateKey);
       const token = createSession(user);
+      db.consents = db.consents || [];
+      db.consents.push({
+        id: `consent_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
+        companyId: user.companyId,
+        userId: user.id,
+        type: "legal-login-acceptance",
+        text: "Aceite dos Termos de Uso, Politica de Privacidade e consentimento de tratamento de dados emocionais para uso da plataforma.",
+        accepted: true,
+        policyVersion: "2026-05-lgpd-mental-health",
+        ipHash: crypto.createHash("sha256").update(String(req.socket.remoteAddress || "local")).digest("hex").slice(0, 16),
+        userAgent: String(req.headers["user-agent"] || "").slice(0, 180),
+        date: new Date().toISOString(),
+      });
+      addAudit(db, { action: "consent.login_legal_acceptance", userId: user.id, companyId: user.companyId });
+      writeDb(db);
       sendJson(res, 200, { token, user: publicUser(user) });
       return;
     }
@@ -887,6 +906,10 @@ async function routeApi(req, res) {
       }
       if (String(body.password).length < 6) {
         sendJson(res, 400, { error: "A senha precisa ter pelo menos 6 caracteres" });
+        return;
+      }
+      if (body.acceptedTerms !== true || body.acceptedSensitiveData !== true) {
+        sendJson(res, 400, { error: "Aceite os Termos, a Politica de Privacidade e o consentimento de dados para criar a empresa." });
         return;
       }
       if (db.users.some((user) => user.email === String(body.email).trim().toLowerCase())) {
@@ -919,7 +942,23 @@ async function routeApi(req, res) {
       });
       db.companies.push(company);
       db.users.push(owner);
+      db.consents = db.consents || [];
+      const consentDate = new Date().toISOString();
+      const consentBase = {
+        companyId,
+        userId: owner.id,
+        accepted: true,
+        policyVersion: "2026-05-lgpd-mental-health",
+        ipHash: crypto.createHash("sha256").update(String(req.socket.remoteAddress || "local")).digest("hex").slice(0, 16),
+        userAgent: String(req.headers["user-agent"] || "").slice(0, 180),
+        date: consentDate,
+      };
+      db.consents.push(
+        { ...consentBase, id: `consent_${Date.now()}_terms`, type: "company-registration-terms", text: "Aceite dos Termos de Uso e Politica de Privacidade no cadastro da empresa." },
+        { ...consentBase, id: `consent_${Date.now()}_sensitive`, type: "company-registration-sensitive-data", text: "Consentimento para tratamento de dados emocionais, relatos, HSE, NR-1/PGR e indicadores agregados." },
+      );
       db.audit.push({ id: `audit_${Date.now()}`, action: "company.created", userId: owner.id, companyId, date: new Date().toISOString() });
+      addAudit(db, { action: "consent.company_registration_acceptance", userId: owner.id, companyId });
       writeDb(db);
       const token = createSession(owner);
       sendJson(res, 201, { token, user: publicUser(owner), company });

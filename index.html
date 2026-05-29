@@ -770,6 +770,10 @@
         <form class="auth-form active" id="loginForm">
           <label>E-mail <input name="email" required type="email" value="colaborador@equilibria.demo" /></label>
           <label>Senha <input name="password" required type="password" value="demo123" /></label>
+          <label class="legal-acceptance">
+            <input name="acceptedLegal" required type="checkbox" />
+            <span>Li e aceito os <a href="termos-uso.html" target="_blank">Termos de Uso</a>, a <a href="politica-privacidade.html" target="_blank">Politica de Privacidade</a> e o uso dos meus dados para apoio emocional, indicadores agregados e gestao preventiva.</span>
+          </label>
           <button class="primary-button wide" type="submit">Entrar</button>
           <button class="ghost-button wide" data-auth-mode="register" type="button">Criar empresa</button>
         </form>
@@ -780,6 +784,14 @@
           <label>E-mail <input name="email" required type="email" placeholder="voce@empresa.com" /></label>
           <label>Senha <input name="password" minlength="6" required type="password" /></label>
           <label>Equipes iniciais <input name="teams" value="Geral,Atendimento,Comercial,Operações" /></label>
+          <label class="legal-acceptance">
+            <input name="acceptedTerms" required type="checkbox" />
+            <span>Li e aceito os <a href="termos-uso.html" target="_blank">Termos de Uso</a> e a <a href="politica-privacidade.html" target="_blank">Politica de Privacidade</a>.</span>
+          </label>
+          <label class="legal-acceptance">
+            <input name="acceptedSensitiveData" required type="checkbox" />
+            <span>Autorizo o tratamento de dados emocionais e relatos para relatorios pessoais, indicadores agregados, HSE, NR-1/PGR e plano de acao do RH.</span>
+          </label>
           <button class="primary-button wide" type="submit">Criar e entrar</button>
           <button class="ghost-button wide" data-auth-mode="login" type="button">Voltar ao login</button>
         </form>

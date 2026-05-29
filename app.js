@@ -122,13 +122,13 @@ function calculateRisk(entry) {
 
 async function login(kind = "employee") {
   const account = demoAccounts[kind] || demoAccounts.employee;
-  await loginWithCredentials(account.email, account.password);
+  await loginWithCredentials(account.email, account.password, true);
 }
 
-async function loginWithCredentials(email, password) {
+async function loginWithCredentials(email, password, acceptedLegal = false) {
   const data = await request("/api/login", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, acceptedLegal }),
   });
   authToken = data.token;
   currentUser = data.user;
@@ -158,6 +158,8 @@ async function registerCompany(formData) {
       email: formData.get("email"),
       password: formData.get("password"),
       teams: formData.get("teams"),
+      acceptedTerms: formData.get("acceptedTerms") === "on",
+      acceptedSensitiveData: formData.get("acceptedSensitiveData") === "on",
     }),
   });
   authToken = data.token;
@@ -936,7 +938,7 @@ loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const formData = new FormData(loginForm);
   try {
-    await loginWithCredentials(formData.get("email"), formData.get("password"));
+    await loginWithCredentials(formData.get("email"), formData.get("password"), formData.get("acceptedLegal") === "on");
   } catch (error) {
     showToast(error.message);
   }
