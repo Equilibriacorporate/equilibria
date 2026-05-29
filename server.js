@@ -50,6 +50,7 @@ const planCatalog = {
     hasHse: false,
     hasActionPlan: false,
     hasNr1: false,
+    hasRhChat: false,
   },
   Profissional: {
     name: "Profissional",
@@ -61,6 +62,7 @@ const planCatalog = {
     hasHse: true,
     hasActionPlan: true,
     hasNr1: true,
+    hasRhChat: false,
   },
   Enterprise: {
     name: "Enterprise",
@@ -72,6 +74,7 @@ const planCatalog = {
     hasHse: true,
     hasActionPlan: true,
     hasNr1: true,
+    hasRhChat: true,
   },
 };
 
@@ -275,6 +278,7 @@ function createSeedData() {
     checkins: entries,
     consents: [],
     feedback: [],
+    chatMessages: [],
     preventiveActions: [],
     hseResponses: [
       {
@@ -302,7 +306,13 @@ function ensureDb({ reset = false } = {}) {
 
 function readDb() {
   ensureDb();
-  return JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
+  const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
+  db.feedback = db.feedback || [];
+  db.chatMessages = db.chatMessages || [];
+  db.preventiveActions = db.preventiveActions || [];
+  db.hseResponses = db.hseResponses || [];
+  db.audit = db.audit || [];
+  return db;
 }
 
 function writeDb(db) {
@@ -328,6 +338,7 @@ function companyDataCounts(db, companyId) {
     checkins: (db.checkins || []).filter((item) => item.companyId === companyId).length,
     consents: (db.consents || []).filter((item) => item.companyId === companyId).length,
     feedback: (db.feedback || []).filter((item) => item.companyId === companyId).length,
+    chatMessages: (db.chatMessages || []).filter((item) => item.companyId === companyId).length,
     hseResponses: (db.hseResponses || []).filter((item) => item.companyId === companyId).length,
     preventiveActions: (db.preventiveActions || []).filter((item) => item.companyId === companyId).length,
     audit: (db.audit || []).filter((item) => item.companyId === companyId).length,
@@ -339,6 +350,7 @@ function purgeCompanyOperationalData(db, companyId, { keepAudit = true } = {}) {
   db.checkins = (db.checkins || []).filter((item) => item.companyId !== companyId);
   db.consents = (db.consents || []).filter((item) => item.companyId !== companyId);
   db.feedback = (db.feedback || []).filter((item) => item.companyId !== companyId);
+  db.chatMessages = (db.chatMessages || []).filter((item) => item.companyId !== companyId);
   db.hseResponses = (db.hseResponses || []).filter((item) => item.companyId !== companyId);
   db.preventiveActions = (db.preventiveActions || []).filter((item) => item.companyId !== companyId);
   if (!keepAudit) db.audit = (db.audit || []).filter((item) => item.companyId !== companyId);
@@ -352,6 +364,7 @@ function applyRetentionPolicy(db, companyId, retentionDays) {
   db.checkins = (db.checkins || []).filter((item) => item.companyId !== companyId || isRecent(item));
   db.consents = (db.consents || []).filter((item) => item.companyId !== companyId || isRecent(item));
   db.feedback = (db.feedback || []).filter((item) => item.companyId !== companyId || isRecent(item));
+  db.chatMessages = (db.chatMessages || []).filter((item) => item.companyId !== companyId || isRecent(item));
   db.hseResponses = (db.hseResponses || []).filter((item) => item.companyId !== companyId || isRecent(item));
   db.preventiveActions = (db.preventiveActions || []).filter((item) => item.companyId !== companyId || isRecent(item));
   const after = companyDataCounts(db, companyId);
@@ -405,6 +418,29 @@ function companyAccessStatus(company = {}) {
 function requireFeature(db, user, feature) {
   const plan = companyPlan(db, user);
   return Boolean(plan[feature]);
+}
+
+function publicChatThreadId(companyId, userId) {
+  return `thread_${crypto.createHash("sha256").update(`${companyId}:${userId}:equilibria-rh-chat`).digest("hex").slice(0, 14)}`;
+}
+
+function publicChatMessage(message, viewer) {
+  const isManager = requireManager(viewer);
+  const isOwnThread = message.userId === viewer.id;
+  const senderIsViewer = message.senderUserId === viewer.id;
+  const displayName = message.anonymous && isManager ? "Colaborador anônimo" : message.senderName;
+  return {
+    id: message.id,
+    threadId: publicChatThreadId(message.companyId, message.userId),
+    ownThread: isOwnThread,
+    fromMe: senderIsViewer,
+    senderRole: message.senderRole,
+    senderName: displayName,
+    anonymous: Boolean(message.anonymous),
+    team: message.anonymous && isManager ? "Não identificado" : message.team,
+    message: message.message,
+    createdAt: message.createdAt,
+  };
 }
 
 function hseDimensionScores(responses = []) {
@@ -1039,8 +1075,8 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "GET" && url.pathname === "/api/users") {
-      if (!requireManager(user)) {
-        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+      if (!requirePlatformAdmin(user)) {
+        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
         return;
       }
       const users = db.users.filter((item) => item.companyId === user.companyId).map(publicUser);
@@ -1049,8 +1085,8 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "POST" && url.pathname === "/api/users") {
-      if (!requireManager(user)) {
-        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+      if (!requirePlatformAdmin(user)) {
+        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
         return;
       }
       const body = await readBody(req);
@@ -1131,8 +1167,8 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "PATCH" && url.pathname.startsWith("/api/users/") && url.pathname.endsWith("/password")) {
-      if (!requireManager(user)) {
-        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+      if (!requirePlatformAdmin(user)) {
+        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
         return;
       }
       const targetUserId = decodeURIComponent(url.pathname.split("/")[3]);
@@ -1155,8 +1191,8 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "GET" && url.pathname === "/api/admin/governance") {
-      if (!requireManager(user)) {
-        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+      if (!requirePlatformAdmin(user)) {
+        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
         return;
       }
       const company = db.companies.find((item) => item.id === user.companyId);
@@ -1172,8 +1208,8 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "PATCH" && url.pathname === "/api/admin/governance") {
-      if (!requireManager(user)) {
-        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+      if (!requirePlatformAdmin(user)) {
+        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
         return;
       }
       const body = await readBody(req);
@@ -1191,8 +1227,8 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "POST" && url.pathname === "/api/admin/apply-retention") {
-      if (!requireManager(user)) {
-        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+      if (!requirePlatformAdmin(user)) {
+        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
         return;
       }
       const company = db.companies.find((item) => item.id === user.companyId);
@@ -1204,8 +1240,8 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "POST" && url.pathname === "/api/admin/purge-company-data") {
-      if (user.role !== "admin") {
-        sendJson(res, 403, { error: "Acesso restrito a administradores" });
+      if (!requirePlatformAdmin(user)) {
+        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
         return;
       }
       const body = await readBody(req);
@@ -1221,8 +1257,8 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "GET" && url.pathname === "/api/admin/audit") {
-      if (!requireManager(user)) {
-        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+      if (!requirePlatformAdmin(user)) {
+        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
         return;
       }
       const logs = (db.audit || [])
@@ -1244,7 +1280,21 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "GET" && url.pathname === "/api/dashboard") {
-      sendJson(res, 200, buildDashboard(db, user));
+      const dashboard = buildDashboard(db, user);
+      if (user.role === "employee") {
+        const ownEntries = companyEntries(db, user).filter((entry) => entry.userId === user.id);
+        dashboard.metrics = {
+          mood: average(ownEntries.map((entry) => entry.mood)) || 0,
+          energy: average(ownEntries.map((entry) => entry.energy)) || 0,
+          risk: average(ownEntries.map(riskScore)) || 0,
+          checkinRate: ownEntries.length ? 100 : 0,
+          count: ownEntries.length,
+        };
+        dashboard.teams = [];
+        dashboard.alerts = [];
+        dashboard.recentEntries = ownEntries.slice(-14);
+      }
+      sendJson(res, 200, dashboard);
       return;
     }
 
@@ -1255,8 +1305,8 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "POST" && url.pathname === "/api/company/plan") {
-      if (!requireManager(user)) {
-        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+      if (!requirePlatformAdmin(user)) {
+        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
         return;
       }
       const body = await readBody(req);
@@ -1469,6 +1519,73 @@ async function routeApi(req, res) {
       return;
     }
 
+    if (req.method === "GET" && url.pathname === "/api/rh-chat") {
+      if (!requireFeature(db, user, "hasRhChat")) {
+        sendJson(res, 403, { error: "Chat com RH disponível apenas no plano Enterprise." });
+        return;
+      }
+      const companyMessages = (db.chatMessages || [])
+        .filter((item) => item.companyId === user.companyId)
+        .filter((item) => requireManager(user) || item.userId === user.id)
+        .slice(-120)
+        .map((item) => publicChatMessage(item, user));
+      sendJson(res, 200, {
+        messages: companyMessages,
+        canManage: requireManager(user),
+      });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/rh-chat") {
+      if (!requireFeature(db, user, "hasRhChat")) {
+        sendJson(res, 403, { error: "Chat com RH disponível apenas no plano Enterprise." });
+        return;
+      }
+      const body = await readBody(req);
+      const text = String(body.message || "").trim();
+      if (!text) {
+        sendJson(res, 400, { error: "Escreva uma mensagem antes de enviar." });
+        return;
+      }
+
+      let threadUserId = user.id;
+      let anonymous = body.anonymous === true && user.role === "employee";
+      if (requireManager(user)) {
+        const targetThreadId = String(body.threadId || "");
+        const targetMessage = (db.chatMessages || []).find((item) => item.companyId === user.companyId && publicChatThreadId(item.companyId, item.userId) === targetThreadId);
+        if (!targetMessage) {
+          sendJson(res, 400, { error: "Selecione uma conversa para responder." });
+          return;
+        }
+        threadUserId = targetMessage.userId;
+        anonymous = false;
+      }
+
+      const message = {
+        id: `chat_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
+        companyId: user.companyId,
+        userId: threadUserId,
+        senderUserId: user.id,
+        senderRole: user.role,
+        senderName: user.name,
+        team: user.team,
+        anonymous,
+        message: text,
+        createdAt: new Date().toISOString(),
+      };
+      db.chatMessages = db.chatMessages || [];
+      db.chatMessages.push(message);
+      addAudit(db, { action: "rh_chat.message.created", userId: user.id, companyId: user.companyId, detail: anonymous ? "anonymous" : "identified" });
+      writeDb(db);
+      const messages = db.chatMessages
+        .filter((item) => item.companyId === user.companyId)
+        .filter((item) => requireManager(user) || item.userId === user.id)
+        .slice(-120)
+        .map((item) => publicChatMessage(item, user));
+      sendJson(res, 201, { message: publicChatMessage(message, user), messages, canManage: requireManager(user) });
+      return;
+    }
+
     if (req.method === "POST" && url.pathname === "/api/feedback") {
       if (!requireFeature(db, user, "hasFeedback")) {
         sendJson(res, 403, { error: "Voz anônima disponível nos planos Profissional e Enterprise." });
@@ -1525,6 +1642,18 @@ async function routeApi(req, res) {
 
     if (req.method === "GET" && url.pathname === "/api/export") {
       const dashboard = buildDashboard(db, user);
+      if (user.role === "employee") {
+        const personal = buildPersonalReport(db, user);
+        sendJson(res, 200, {
+          filename: "equilibria-relatorio-pessoal.json",
+          report: {
+            generatedAt: new Date().toISOString(),
+            company: dashboard.company.name,
+            personal,
+          },
+        });
+        return;
+      }
       sendJson(res, 200, {
         filename: "equilibria-relatorio.json",
         report: {
@@ -1540,8 +1669,8 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "GET" && url.pathname === "/api/admin/backup") {
-      if (user.role !== "admin") {
-        sendJson(res, 403, { error: "Acesso restrito a administradores" });
+      if (!requirePlatformAdmin(user)) {
+        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
         return;
       }
       sendJson(res, 200, {
@@ -1555,6 +1684,7 @@ async function routeApi(req, res) {
             checkins: db.checkins.filter((item) => item.companyId === user.companyId),
             consents: (db.consents || []).filter((item) => item.companyId === user.companyId),
             feedback: (db.feedback || []).filter((item) => item.companyId === user.companyId),
+            chatMessages: (db.chatMessages || []).filter((item) => item.companyId === user.companyId),
             hseResponses: (db.hseResponses || []).filter((item) => item.companyId === user.companyId),
             preventiveActions: (db.preventiveActions || []).filter((item) => item.companyId === user.companyId),
             audit: db.audit.filter((item) => item.companyId === user.companyId || item.userId === user.id),

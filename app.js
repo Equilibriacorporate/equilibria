@@ -62,9 +62,17 @@ const onboardingProgress = document.querySelector("#onboardingProgress");
 const onboardingStatus = document.querySelector("#onboardingStatus");
 const copyOnboardingMessage = document.querySelector("#copyOnboardingMessage");
 const onboardingMessage = document.querySelector("#onboardingMessage");
+const roleSwitcher = document.querySelector(".role-switcher");
+const rhChatList = document.querySelector("#rhChatList");
+const rhChatForm = document.querySelector("#rhChatForm");
+const rhChatStatus = document.querySelector("#rhChatStatus");
+const rhChatThreadSelect = document.querySelector("#rhChatThreadSelect");
+const rhChatThreadLabel = document.querySelector("#rhChatThreadLabel");
+const rhChatAnonymousLine = document.querySelector("#rhChatAnonymousLine");
 
 let hseQuestions = [];
 let nr1ReportState = null;
+let rhChatThreads = [];
 
 function showToast(message) {
   toast.textContent = message;
@@ -73,10 +81,92 @@ function showToast(message) {
 }
 
 function switchSection(sectionId) {
+  if (currentUser && !allowedSections().includes(sectionId)) {
+    sectionId = defaultSection();
+  }
   sections.forEach((section) => section.classList.toggle("active", section.id === sectionId));
   navButtons.forEach((button) => button.classList.toggle("active", button.dataset.section === sectionId));
   document.body.dataset.activeSection = sectionId;
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function isPlatformAdmin() {
+  return currentUser?.role === "admin" && currentUser?.email === "admin@equilibria.demo";
+}
+
+function planFeatures() {
+  return dashboardState?.plan || {};
+}
+
+function hasFeature(feature) {
+  return Boolean(planFeatures()[feature]);
+}
+
+function allowedSections() {
+  if (!currentUser) return ["dashboard"];
+  if (isPlatformAdmin()) {
+    return ["dashboard", "checkin", "hse", "personal", "teams", "interventions", "actionplan", "nr1", "assistant", "feedback", "rhchat", "commercial", "onboarding", "governance", "admin"];
+  }
+  if (currentUser.role === "manager" || currentUser.role === "admin") {
+    return [
+      "dashboard",
+      "hse",
+      "teams",
+      "interventions",
+      "actionplan",
+      "nr1",
+      ...(hasFeature("hasAssistant") ? ["assistant"] : []),
+      ...(hasFeature("hasFeedback") ? ["feedback"] : []),
+      ...(hasFeature("hasRhChat") ? ["rhchat"] : []),
+      "onboarding",
+    ];
+  }
+  return [
+    "checkin",
+    ...(hasFeature("hasHse") ? ["hse"] : []),
+    "personal",
+    ...(hasFeature("hasAssistant") ? ["assistant"] : []),
+    ...(hasFeature("hasFeedback") ? ["feedback"] : []),
+    ...(hasFeature("hasRhChat") ? ["rhchat"] : []),
+  ];
+}
+
+function defaultSection() {
+  return allowedSections()[0] || "checkin";
+}
+
+function applyAccessControl() {
+  const allowed = allowedSections();
+  roleSwitcher?.classList.add("is-hidden");
+  document.body.dataset.userRole = currentUser?.role || "guest";
+  document.body.dataset.platformAdmin = isPlatformAdmin() ? "true" : "false";
+  navButtons.forEach((button) => {
+    const visible = allowed.includes(button.dataset.section);
+    button.classList.toggle("is-hidden", !visible);
+  });
+  sections.forEach((section) => section.classList.toggle("is-hidden", !allowed.includes(section.id)));
+  if (!allowed.includes(document.body.dataset.activeSection)) switchSection(defaultSection());
+}
+
+async function loadAppData() {
+  await loadDashboard();
+  applyAccessControl();
+  await loadPersonalReport();
+  await loadHseStatus();
+  await loadAssistantStatus();
+  if (isPlatformAdmin()) {
+    await loadUsers();
+    await loadPlatformCompanies();
+    await loadGovernance();
+    await loadAuditLogs();
+  }
+  if (currentUser?.role !== "employee") {
+    await loadFeedback();
+    await loadActionPlan();
+    await loadNr1Report();
+  }
+  if (hasFeature("hasRhChat")) await loadRhChat();
+  applyAccessControl();
 }
 
 async function request(path, options = {}) {
@@ -141,18 +231,9 @@ async function loginWithCredentials(email, password, acceptedLegal = false) {
   localStorage.setItem("equilibria_token", authToken);
   authModal.classList.remove("show");
   updateUserBadge();
-  await loadDashboard();
-  await loadPersonalReport();
-  await loadUsers();
-  await loadFeedback();
-  await loadHseStatus();
-  await loadActionPlan();
-  await loadNr1Report();
-  await loadPlatformCompanies();
-  await loadGovernance();
-  await loadAuditLogs();
-  await loadAssistantStatus();
+  await loadAppData();
   setRole(currentUser.role === "employee" ? "employee" : "manager", false);
+  switchSection(defaultSection());
   showToast(`Conectado como ${currentUser.name}.`);
 }
 
@@ -174,17 +255,9 @@ async function registerCompany(formData) {
   localStorage.setItem("equilibria_token", authToken);
   authModal.classList.remove("show");
   updateUserBadge();
-  await loadDashboard();
-  await loadPersonalReport();
-  await loadUsers();
-  await loadFeedback();
-  await loadHseStatus();
-  await loadActionPlan();
-  await loadNr1Report();
-  await loadPlatformCompanies();
-  await loadGovernance();
-  await loadAuditLogs();
+  await loadAppData();
   setRole("manager", false);
+  switchSection(defaultSection());
   showToast("Empresa criada. Você entrou como administrador.");
 }
 
@@ -193,7 +266,7 @@ function updateUserBadge() {
     currentUserBadge.textContent = "Não conectado";
     return;
   }
-  const role = currentUser.role === "employee" ? "Colaborador" : "RH/Gestor";
+  const role = isPlatformAdmin() ? "Admin Equilibria" : currentUser.role === "employee" ? "Colaborador" : "RH/Gestor";
   currentUserBadge.textContent = `${currentUser.name} · ${role}`;
 }
 
@@ -214,8 +287,9 @@ async function loadPersonalReport() {
 }
 
 async function loadUsers() {
-  if (!currentUser || currentUser.role === "employee") {
-    userList.innerHTML = "<p>Disponível para RH/Gestor e administradores.</p>";
+  if (!userList) return;
+  if (!isPlatformAdmin()) {
+    userList.innerHTML = "<p>Área restrita à administração Equilibria.</p>";
     return;
   }
   try {
@@ -227,6 +301,7 @@ async function loadUsers() {
 }
 
 async function loadFeedback() {
+  if (!anonymousList) return;
   if (!currentUser || currentUser.role === "employee") {
     anonymousList.innerHTML = "<p>Relatos enviados aqui aparecem para RH/Gestor sem identificação pessoal.</p>";
     return;
@@ -236,6 +311,22 @@ async function loadFeedback() {
     renderFeedback(data.feedback);
   } catch (error) {
     anonymousList.innerHTML = `<p>${error.message}</p>`;
+  }
+}
+
+async function loadRhChat() {
+  if (!rhChatList) return;
+  if (!hasFeature("hasRhChat")) {
+    rhChatList.innerHTML = "<p>Chat RH-colaborador disponível apenas no plano Enterprise.</p>";
+    if (rhChatStatus) rhChatStatus.textContent = "Bloqueado neste plano";
+    return;
+  }
+  try {
+    const data = await request("/api/rh-chat");
+    renderRhChat(data.messages || [], data.canManage);
+  } catch (error) {
+    rhChatList.innerHTML = `<p>${error.message}</p>`;
+    if (rhChatStatus) rhChatStatus.textContent = "Indisponível";
   }
 }
 
@@ -316,8 +407,8 @@ async function loadPlatformCompanies() {
 
 async function loadGovernance() {
   if (!governanceCounts) return;
-  if (!currentUser || currentUser.role === "employee") {
-    governanceCounts.innerHTML = "<p>Disponível para RH/Gestor.</p>";
+  if (!isPlatformAdmin()) {
+    governanceCounts.innerHTML = "<p>Área restrita à administração Equilibria.</p>";
     return;
   }
   try {
@@ -331,8 +422,8 @@ async function loadGovernance() {
 
 async function loadAuditLogs() {
   if (!auditLogList) return;
-  if (!currentUser || currentUser.role === "employee") {
-    auditLogList.innerHTML = "<p>Disponível para RH/Gestor.</p>";
+  if (!isPlatformAdmin()) {
+    auditLogList.innerHTML = "<p>Área restrita à administração Equilibria.</p>";
     return;
   }
   try {
@@ -413,6 +504,7 @@ function renderGovernanceCounts(counts) {
     checkins: "Check-ins",
     consents: "Consentimentos",
     feedback: "Relatos",
+    chatMessages: "Chat RH",
     hseResponses: "HSE",
     preventiveActions: "Ações NR-1",
     audit: "Logs",
@@ -640,6 +732,59 @@ function renderFeedback(items) {
             <span>${item.team || "Equipe não informada"} · ${labelSentiment(item.sentiment)}</span>
           </div>
           <p>${escapeHtml(item.message)}</p>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function renderRhChat(messages, canManage) {
+  if (!rhChatList) return;
+  const threads = Array.from(
+    messages.reduce((map, item) => {
+      const current = map.get(item.threadId) || { threadId: item.threadId, label: item.anonymous ? "Conversa anônima" : item.senderName, team: item.team, messages: [] };
+      current.messages.push(item);
+      if (!item.anonymous && item.senderRole === "employee") current.label = item.senderName;
+      map.set(item.threadId, current);
+      return map;
+    }, new Map()).values(),
+  ).sort((a, b) => new Date(b.messages.at(-1)?.createdAt || 0) - new Date(a.messages.at(-1)?.createdAt || 0));
+
+  rhChatThreads = threads;
+  if (rhChatStatus) rhChatStatus.textContent = canManage ? `${threads.length} conversa(s)` : "Canal direto com RH";
+  if (rhChatThreadLabel) rhChatThreadLabel.style.display = canManage ? "grid" : "none";
+  if (rhChatAnonymousLine) rhChatAnonymousLine.style.display = canManage ? "none" : "flex";
+  if (rhChatThreadSelect) {
+    rhChatThreadSelect.innerHTML = threads.map((thread) => `<option value="${thread.threadId}">${escapeHtml(thread.label)} · ${escapeHtml(thread.team || "sem equipe")}</option>`).join("");
+  }
+
+  if (!messages.length) {
+    rhChatList.innerHTML = canManage
+      ? "<p>Nenhuma conversa iniciada ainda. Quando um colaborador escrever, aparecerá aqui.</p>"
+      : "<p>Nenhuma mensagem ainda. Você pode iniciar uma conversa com o RH.</p>";
+    return;
+  }
+
+  rhChatList.innerHTML = threads
+    .map(
+      (thread) => `
+        <article class="rh-chat-thread">
+          <div class="rh-chat-thread-head">
+            <strong>${escapeHtml(thread.label)}</strong>
+            <span>${escapeHtml(thread.team || "Equipe não informada")}</span>
+          </div>
+          <div class="rh-chat-messages">
+            ${thread.messages
+              .map(
+                (item) => `
+                  <div class="rh-chat-message ${item.fromMe ? "from-me" : ""}">
+                    <span>${escapeHtml(item.senderName || "Mensagem")} · ${new Date(item.createdAt).toLocaleString("pt-BR")}</span>
+                    <p>${escapeHtml(item.message)}</p>
+                  </div>
+                `,
+              )
+              .join("")}
+          </div>
         </article>
       `,
     )
@@ -1038,7 +1183,7 @@ document.querySelectorAll('input[type="range"]').forEach((input) => {
   });
 });
 
-feedbackForm.addEventListener("submit", async (event) => {
+feedbackForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const formData = new FormData(feedbackForm);
   try {
@@ -1055,6 +1200,26 @@ feedbackForm.addEventListener("submit", async (event) => {
     await loadActionPlan();
     await loadNr1Report();
     showToast("Relato anônimo enviado com segurança.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+rhChatForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(rhChatForm);
+  try {
+    const data = await request("/api/rh-chat", {
+      method: "POST",
+      body: JSON.stringify({
+        threadId: formData.get("threadId"),
+        message: formData.get("message"),
+        anonymous: formData.get("anonymous") === "on",
+      }),
+    });
+    rhChatForm.reset();
+    renderRhChat(data.messages || [], data.canManage);
+    showToast("Mensagem enviada ao chat.");
   } catch (error) {
     showToast(error.message);
   }
@@ -1373,18 +1538,9 @@ async function boot() {
       const data = await request("/api/me");
       currentUser = data.user;
       updateUserBadge();
-      await loadDashboard();
-      await loadPersonalReport();
-      await loadUsers();
-      await loadFeedback();
-      await loadHseStatus();
-      await loadActionPlan();
-      await loadNr1Report();
-      await loadPlatformCompanies();
-      await loadGovernance();
-      await loadAuditLogs();
-      await loadAssistantStatus();
+      await loadAppData();
       setRole(currentUser.role === "employee" ? "employee" : "manager", false);
+      switchSection(defaultSection());
     } else {
       authModal.classList.add("show");
     }

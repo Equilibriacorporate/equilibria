@@ -75,6 +75,10 @@
             <span aria-hidden="true">◐</span>
             Voz anônima
           </button>
+          <button class="nav-item" data-section="rhchat" type="button">
+            <span aria-hidden="true">↔</span>
+            Chat RH
+          </button>
           <button class="nav-item" data-section="commercial" type="button">
             <span aria-hidden="true">$</span>
             Venda
@@ -533,6 +537,45 @@
           </div>
         </section>
 
+        <section class="workspace-section" id="rhchat" aria-labelledby="rhChatTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Plano Enterprise</p>
+              <h2 id="rhChatTitle">Chat entre colaborador e RH</h2>
+            </div>
+            <span class="status-pill private">Com opção anônima</span>
+          </div>
+
+          <div class="rh-chat-layout">
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Conversas</h3>
+                <span id="rhChatStatus">Disponível no pacote especial</span>
+              </div>
+              <div class="rh-chat-list" id="rhChatList"></div>
+            </article>
+
+            <article class="panel soft-panel">
+              <h3>Enviar mensagem</h3>
+              <form class="rh-chat-form" id="rhChatForm">
+                <label id="rhChatThreadLabel">
+                  Conversa
+                  <select name="threadId" id="rhChatThreadSelect"></select>
+                </label>
+                <label>
+                  Mensagem
+                  <textarea name="message" required placeholder="Escreva sua mensagem para o RH ou para o colaborador."></textarea>
+                </label>
+                <label class="consent-line" id="rhChatAnonymousLine">
+                  <input name="anonymous" type="checkbox" />
+                  Enviar anonimamente para o RH
+                </label>
+                <button class="primary-button wide" type="submit">Enviar mensagem</button>
+              </form>
+            </article>
+          </div>
+        </section>
+
         <section class="workspace-section" id="commercial" aria-labelledby="pricingTitle">
           <div class="section-heading">
             <div>
@@ -579,6 +622,7 @@
                 <li>Integrações e API</li>
                 <li>Relatórios executivos personalizados</li>
                 <li>Governança LGPD avançada</li>
+                <li>Chat RH-colaborador com opção anônima</li>
                 <li>HSE mensal e plano RH avançado</li>
                 <li>Onboarding e suporte dedicado</li>
               </ul>
@@ -843,6 +887,10 @@
       <button class="nav-item mobile-tab" data-section="feedback" type="button">
         <span aria-hidden="true">◐</span>
         Voz
+      </button>
+      <button class="nav-item mobile-tab" data-section="rhchat" type="button">
+        <span aria-hidden="true">↔</span>
+        RH
       </button>
       <button class="nav-item mobile-tab" data-section="personal" type="button">
         <span aria-hidden="true">◎</span>
