@@ -10,6 +10,9 @@ const SESSION_TTL_MS = Number(globalThis.process?.env?.SESSION_TTL_MS || 1000 * 
 const LOGIN_WINDOW_MS = 1000 * 60 * 10;
 const LOGIN_MAX_ATTEMPTS = 8;
 const MIN_TEAM_SAMPLE = Number(globalThis.process?.env?.MIN_TEAM_SAMPLE || 3);
+const OPENAI_API_KEY = globalThis.process?.env?.OPENAI_API_KEY || "";
+const OPENAI_MODEL = globalThis.process?.env?.OPENAI_MODEL || "gpt-5.4-mini";
+const OPENAI_TIMEOUT_MS = Number(globalThis.process?.env?.OPENAI_TIMEOUT_MS || 18000);
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(ROOT, "data");
 const DB_PATH = path.join(DATA_DIR, "equilibria-db.json");
@@ -1216,8 +1219,10 @@ async function routeApi(req, res) {
         return;
       }
       const body = await readBody(req);
-      const reply = buildAssistantReply(String(body.message || ""));
-      sendJson(res, 200, { reply });
+      const message = String(body.message || "");
+      const fallbackReply = buildAssistantReply(message);
+      const ai = await buildSmartAssistantReply(db, user, message, fallbackReply);
+      sendJson(res, 200, ai);
       return;
     }
 
@@ -1375,6 +1380,105 @@ function buildAssistantReply(message) {
     "Se for algo pontual, registre o contexto e observe se passa. Se for repetido, vale transformar em dado: frequência, gatilho e impacto na sua energia.",
     "Quer me contar um pouco mais sobre o que aconteceu antes desse sentimento aparecer?",
   ].join("\n\n");
+}
+
+function extractOpenAIText(payload = {}) {
+  if (payload.output_text) return String(payload.output_text).trim();
+  const pieces = [];
+  for (const item of payload.output || []) {
+    for (const content of item.content || []) {
+      if (content.text) pieces.push(content.text);
+      if (content.type === "output_text" && content.text) pieces.push(content.text);
+    }
+  }
+  return pieces.join("\n").trim();
+}
+
+function buildAssistantContext(db, user) {
+  const entries = companyEntries(db, user).filter((entry) => entry.userId === user.id).slice(-5);
+  const latest = entries.slice(-1)[0];
+  const personal = buildPersonalReport(db, user);
+  return {
+    role: user.role,
+    team: user.team,
+    latestCheckin: latest
+      ? {
+          moment: latest.moment,
+          mood: latest.mood,
+          energy: latest.energy,
+          pressure: latest.pressure,
+          support: latest.support,
+          note: latest.note,
+        }
+      : null,
+    recentPersonalSignals: personal.items.slice(0, 3),
+  };
+}
+
+function assistantSystemPrompt() {
+  return [
+    "Voce e a IA de apoio interno do Equilibria, uma plataforma de gestao emocional corporativa.",
+    "Responda em portugues do Brasil, com tom humano, acolhedor, direto e pouco mecanico.",
+    "Nao faca diagnostico clinico, nao prometa tratamento e nao substitua psicologo, medico, RH ou emergencia.",
+    "Ajude a pessoa a organizar o que sente, identificar gatilhos do trabalho, pensar no proximo passo e, quando adequado, sugerir uso de RH, lideranca segura, compliance ou canal anonimo.",
+    "Se houver risco de autoagressao, violencia, abuso, assedio grave, dor no peito, falta de ar intensa ou perigo imediato, oriente procurar ajuda imediata/emergencia e uma pessoa de confianca.",
+    "Evite respostas genericas. Use detalhes da mensagem e do contexto. Prefira 2 a 4 paragrafos curtos e uma pergunta final util.",
+  ].join("\n");
+}
+
+async function callOpenAIAssistant(message, context) {
+  if (!OPENAI_API_KEY) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        input: [
+          { role: "system", content: assistantSystemPrompt() },
+          {
+            role: "user",
+            content: [
+              "Mensagem do colaborador:",
+              message,
+              "",
+              "Contexto seguro e limitado do Equilibria:",
+              JSON.stringify(context),
+            ].join("\n"),
+          },
+        ],
+        max_output_tokens: 650,
+      }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error?.message || "Falha na OpenAI");
+    const text = extractOpenAIText(data);
+    return text || null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function buildSmartAssistantReply(db, user, message, fallbackReply) {
+  const raw = String(message || "").trim();
+  if (!raw) return { reply: fallbackReply, source: "local" };
+
+  try {
+    const reply = await callOpenAIAssistant(raw, buildAssistantContext(db, user));
+    if (reply) return { reply, source: "openai", model: OPENAI_MODEL };
+  } catch (error) {
+    console.warn("OpenAI assistant fallback:", error.message);
+  }
+
+  return { reply: fallbackReply, source: OPENAI_API_KEY ? "local-fallback" : "local" };
 }
 
 if (globalThis.process?.argv?.includes("--reset-demo")) {
