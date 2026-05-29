@@ -317,7 +317,7 @@ async function loadPlatformCompanies() {
 async function loadGovernance() {
   if (!governanceCounts) return;
   if (!currentUser || currentUser.role === "employee") {
-    governanceCounts.innerHTML = "<p>DisponÃ­vel para RH/Gestor.</p>";
+    governanceCounts.innerHTML = "<p>Disponível para RH/Gestor.</p>";
     return;
   }
   try {
@@ -332,7 +332,7 @@ async function loadGovernance() {
 async function loadAuditLogs() {
   if (!auditLogList) return;
   if (!currentUser || currentUser.role === "employee") {
-    auditLogList.innerHTML = "<p>DisponÃ­vel para RH/Gestor.</p>";
+    auditLogList.innerHTML = "<p>Disponível para RH/Gestor.</p>";
     return;
   }
   try {
@@ -388,7 +388,7 @@ function renderPlatformCompanies(companies) {
               <input name="employeeCount" min="1" type="number" value="${company.employeeCount || company.users || 1}" />
             </label>
             <label>
-              RetenÃ§Ã£o
+              Retenção
               <input name="retentionDays" min="30" max="1825" type="number" value="${company.retentionDays || 180}" />
             </label>
           </div>
@@ -414,7 +414,7 @@ function renderGovernanceCounts(counts) {
     consents: "Consentimentos",
     feedback: "Relatos",
     hseResponses: "HSE",
-    preventiveActions: "AÃ§Ãµes NR-1",
+    preventiveActions: "Ações NR-1",
     audit: "Logs",
   };
   governanceCounts.innerHTML = Object.entries(labels)
@@ -433,7 +433,7 @@ function renderAuditLogs(logs) {
         <article class="audit-log-item">
           <strong>${escapeHtml(labelAuditAction(log.action))}</strong>
           <span>${new Date(log.date).toLocaleString("pt-BR")}</span>
-          <small>${escapeHtml(log.action)}${log.targetUserId ? ` Â· alvo: ${escapeHtml(log.targetUserId)}` : ""}</small>
+          <small>${escapeHtml(log.action)}${log.targetUserId ? ` · alvo: ${escapeHtml(log.targetUserId)}` : ""}</small>
         </article>
       `,
     )
@@ -444,16 +444,16 @@ function labelAuditAction(action) {
   return {
     "account.password.changed": "Senha alterada",
     "user.password.reset": "Senha redefinida pelo RH",
-    "governance.retention.updated": "PolÃ­tica de retenÃ§Ã£o atualizada",
-    "governance.retention.applied": "RetenÃ§Ã£o aplicada",
-    "company.operational_data.purged": "Dados operacionais excluÃ­dos",
+    "governance.retention.updated": "Política de retenção atualizada",
+    "governance.retention.applied": "Retenção aplicada",
+    "company.operational_data.purged": "Dados operacionais excluídos",
     "consent.recorded": "Consentimento registrado",
-    "user.created": "UsuÃ¡rio criado",
+    "user.created": "Usuário criado",
     "company.created": "Empresa criada",
     "company.plan.updated": "Plano atualizado",
     "platform.company.updated": "Cliente atualizado",
     "checkin.created": "Check-in registrado",
-    "feedback.created": "Relato anÃ´nimo registrado",
+    "feedback.created": "Relato anônimo registrado",
     "hse.response.created": "HSE respondido",
     "nr1.preventive_action.created": "Medida NR-1 criada",
     "nr1.preventive_action.updated": "Medida NR-1 atualizada",
@@ -476,7 +476,7 @@ function updateOnboardingProgress() {
   const total = inputs.length;
   const saved = Object.fromEntries(inputs.map((input) => [input.dataset.onboardingItem, input.checked]));
   localStorage.setItem("equilibria_onboarding", JSON.stringify(saved));
-  onboardingProgress.textContent = `${done}/${total} concluÃ­dos`;
+  onboardingProgress.textContent = `${done}/${total} concluídos`;
   if (onboardingStatus) {
     onboardingStatus.textContent = done === total ? "Pronto para operar" : done >= 5 ? "Quase pronto" : "Pronto para piloto";
     onboardingStatus.className = `status-pill ${done === total ? "stable" : "private"}`;
@@ -676,7 +676,7 @@ function escapeHtml(value) {
 
 function renderUsers(users) {
   if (resetPasswordUser) {
-    resetPasswordUser.innerHTML = users.map((user) => `<option value="${user.id}">${escapeHtml(user.name)} Â· ${escapeHtml(user.email)}</option>`).join("");
+    resetPasswordUser.innerHTML = users.map((user) => `<option value="${user.id}">${escapeHtml(user.name)} · ${escapeHtml(user.email)}</option>`).join("");
   }
   userList.innerHTML = users
     .map(
@@ -710,7 +710,7 @@ function renderDashboard(data) {
   const topRiskAction = document.querySelector("#topRiskAction");
   const nr1Readiness = document.querySelector("#nr1Readiness");
   const nextBestAction = document.querySelector("#nextBestAction");
-  if (topRiskTeam) topRiskTeam.textContent = topTeam ? `${topTeam.team} Â· ${topTeam.risk}%` : "Amostra protegida";
+  if (topRiskTeam) topRiskTeam.textContent = topTeam ? `${topTeam.team} · ${topTeam.risk}%` : "Amostra protegida";
   if (topRiskAction) topRiskAction.textContent = topTeam && topTeam.risk >= 45 ? "Abrir escuta com lideranca e revisar carga em ate 7 dias." : "Manter check-ins e observar tendencia semanal.";
   if (nr1Readiness) nr1Readiness.textContent = metrics.count >= 10 ? "Evidencias em formacao" : "Coletar mais sinais";
   if (nextBestAction) nextBestAction.textContent = metrics.risk >= 45 ? "Acionar Plano RH" : "Revisar NR-1/PGR";
@@ -1146,7 +1146,7 @@ resetPasswordForm?.addEventListener("submit", async (event) => {
     });
     resetPasswordForm.reset();
     await loadAuditLogs();
-    showToast("Senha do usuÃ¡rio redefinida.");
+    showToast("Senha do usuário redefinida.");
   } catch (error) {
     showToast(error.message);
   }
@@ -1162,7 +1162,7 @@ governanceForm?.addEventListener("submit", async (event) => {
     });
     renderGovernanceCounts(data.counts || {});
     await loadAuditLogs();
-    showToast("PolÃ­tica de retenÃ§Ã£o salva.");
+    showToast("Política de retenção salva.");
   } catch (error) {
     showToast(error.message);
   }
@@ -1173,7 +1173,7 @@ applyRetentionButton?.addEventListener("click", async () => {
     const data = await request("/api/admin/apply-retention", { method: "POST", body: "{}" });
     renderGovernanceCounts(data.counts || {});
     await loadAuditLogs();
-    showToast("RetenÃ§Ã£o aplicada.");
+    showToast("Retenção aplicada.");
   } catch (error) {
     showToast(error.message);
   }
@@ -1195,7 +1195,7 @@ purgeDataForm?.addEventListener("submit", async (event) => {
     await loadActionPlan();
     await loadNr1Report();
     await loadAuditLogs();
-    showToast("Dados operacionais excluÃ­dos.");
+    showToast("Dados operacionais excluídos.");
   } catch (error) {
     showToast(error.message);
   }
