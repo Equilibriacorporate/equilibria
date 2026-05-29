@@ -40,8 +40,15 @@ const saveCompanyPlan = document.querySelector("#saveCompanyPlan");
 const platformAdminPanel = document.querySelector("#platformAdminPanel");
 const platformCompanyList = document.querySelector("#platformCompanyList");
 const refreshPlatformCompanies = document.querySelector("#refreshPlatformCompanies");
+const nr1Board = document.querySelector("#nr1Board");
+const nr1Matrix = document.querySelector("#nr1Matrix");
+const nr1Evidence = document.querySelector("#nr1Evidence");
+const nr1ActionForm = document.querySelector("#nr1ActionForm");
+const nr1RiskKey = document.querySelector("#nr1RiskKey");
+const nr1ExportButton = document.querySelector("#nr1ExportButton");
 
 let hseQuestions = [];
+let nr1ReportState = null;
 
 function showToast(message) {
   toast.textContent = message;
@@ -124,6 +131,7 @@ async function loginWithCredentials(email, password) {
   await loadFeedback();
   await loadHseStatus();
   await loadActionPlan();
+  await loadNr1Report();
   await loadPlatformCompanies();
   setRole(currentUser.role === "employee" ? "employee" : "manager", false);
   showToast(`Conectado como ${currentUser.name}.`);
@@ -151,6 +159,7 @@ async function registerCompany(formData) {
   await loadFeedback();
   await loadHseStatus();
   await loadActionPlan();
+  await loadNr1Report();
   await loadPlatformCompanies();
   setRole("manager", false);
   showToast("Empresa criada. Você entrou como administrador.");
@@ -232,6 +241,25 @@ async function loadActionPlan() {
     renderActionPlan(data);
   } catch (error) {
     actionPlanBoard.innerHTML = `<p>${error.message}</p>`;
+  }
+}
+
+async function loadNr1Report() {
+  if (!nr1Board) return;
+  if (!currentUser || currentUser.role === "employee") {
+    nr1Board.innerHTML = "<p>Disponivel para RH/Gestor nos planos Profissional e Enterprise.</p>";
+    if (nr1Matrix) nr1Matrix.innerHTML = "";
+    if (nr1Evidence) nr1Evidence.innerHTML = "";
+    return;
+  }
+  try {
+    const data = await request("/api/nr1-report");
+    nr1ReportState = data;
+    renderNr1Report(data);
+  } catch (error) {
+    nr1Board.innerHTML = `<p>${error.message}</p>`;
+    if (nr1Matrix) nr1Matrix.innerHTML = "";
+    if (nr1Evidence) nr1Evidence.innerHTML = "";
   }
 }
 
@@ -374,6 +402,82 @@ function renderActionPlan(data) {
       `;
     })
     .join("");
+}
+
+function renderNr1Report(data) {
+  if (!data?.risks?.length) {
+    nr1Board.innerHTML = "<p>Sem riscos psicossociais calculados ainda. Estimule check-ins, HSE mensal e voz anonima.</p>";
+    return;
+  }
+
+  if (nr1RiskKey) {
+    nr1RiskKey.innerHTML = data.risks.map((risk) => `<option value="${risk.key}">${escapeHtml(risk.factor)}</option>`).join("");
+  }
+
+  nr1Matrix.innerHTML = `
+    <article><strong>${data.matrix.critical}</strong><span>Criticos</span></article>
+    <article><strong>${data.matrix.high}</strong><span>Altos</span></article>
+    <article><strong>${data.matrix.medium}</strong><span>Medios</span></article>
+    <article><strong>${data.summary.openActions}</strong><span>Acoes abertas</span></article>
+  `;
+
+  nr1Board.innerHTML = data.risks
+    .map((risk) => {
+      const levelClass = risk.level === "Critico" || risk.level === "Alto" ? "danger" : risk.level === "Medio" ? "private" : "stable";
+      return `
+        <article class="nr1-risk-card">
+          <div class="nr1-risk-head">
+            <div>
+              <strong>${escapeHtml(risk.factor)}</strong>
+              <small>${escapeHtml(risk.source)}</small>
+            </div>
+            <span class="status-pill ${levelClass}">${risk.level}</span>
+          </div>
+          <div class="nr1-risk-grid">
+            <span>Probabilidade <b>${risk.probability}/5</b></span>
+            <span>Severidade <b>${risk.severity}/5</b></span>
+            <span>Indice <b>${risk.index}%</b></span>
+            <span>Status <b>${risk.status}</b></span>
+          </div>
+          <p><strong>Medida preventiva:</strong> ${escapeHtml(risk.recommendedMeasure)}</p>
+          <ul>${risk.evidence.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+        </article>
+      `;
+    })
+    .join("");
+
+  nr1Evidence.innerHTML = `
+    <div class="nr1-actions">
+      ${(data.actions || [])
+        .map(
+          (action) => `
+            <article class="nr1-action ${action.status === "Concluida" ? "done" : ""}">
+              <div>
+                <strong>${escapeHtml(action.title)}</strong>
+                <small>${escapeHtml(action.owner)} · prazo: ${escapeHtml(action.deadline)}</small>
+              </div>
+              <span class="status-pill ${action.status === "Concluida" ? "stable" : action.suggested ? "private" : "danger"}">${escapeHtml(action.status)}</span>
+              ${action.suggested ? "" : `<button class="ghost-button" data-complete-action="${action.id}" type="button">Concluir</button>`}
+            </article>
+          `,
+        )
+        .join("")}
+    </div>
+    <div class="nr1-timeline">
+      ${(data.evidenceTimeline || [])
+        .map(
+          (item) => `
+            <article>
+              <strong>${escapeHtml(item.type)}</strong>
+              <span>${new Date(item.date).toLocaleDateString("pt-BR")}</span>
+              <p>${escapeHtml(item.text)}</p>
+            </article>
+          `,
+        )
+        .join("")}
+    </div>
+    <p class="legal-note">${escapeHtml(data.disclaimer)}</p>
+  `;
 }
 
 function renderFeedback(items) {
@@ -789,6 +893,7 @@ feedbackForm.addEventListener("submit", async (event) => {
     feedbackForm.reset();
     await loadFeedback();
     await loadActionPlan();
+    await loadNr1Report();
     showToast("Relato anônimo enviado com segurança.");
   } catch (error) {
     showToast(error.message);
@@ -812,6 +917,7 @@ saveCompanyPlan?.addEventListener("click", async () => {
     await loadDashboard();
     await loadHseStatus();
     await loadActionPlan();
+    await loadNr1Report();
     showToast(`Plano ${companyPlanSelect.value} aplicado.`);
   } catch (error) {
     showToast(error.message);
@@ -830,6 +936,7 @@ hseForm?.addEventListener("submit", async (event) => {
     hseForm.reset();
     await loadHseStatus();
     await loadActionPlan();
+    await loadNr1Report();
     showToast("Questionário mensal enviado.");
   } catch (error) {
     showToast(error.message);
@@ -838,6 +945,60 @@ hseForm?.addEventListener("submit", async (event) => {
 
 refreshActionPlan?.addEventListener("click", loadActionPlan);
 refreshPlatformCompanies?.addEventListener("click", loadPlatformCompanies);
+nr1ExportButton?.addEventListener("click", async () => {
+  try {
+    const data = nr1ReportState || (await request("/api/nr1-report"));
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `equilibria-nr1-pgr-${data.month || "relatorio"}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast("Relatorio NR-1/PGR baixado.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+nr1ActionForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(nr1ActionForm);
+  try {
+    const data = await request("/api/preventive-actions", {
+      method: "POST",
+      body: JSON.stringify({
+        riskKey: formData.get("riskKey"),
+        title: formData.get("title"),
+        owner: formData.get("owner"),
+        deadline: formData.get("deadline"),
+        evidence: formData.get("evidence"),
+      }),
+    });
+    nr1ReportState = data.report;
+    renderNr1Report(data.report);
+    nr1ActionForm.reset();
+    showToast("Medida preventiva registrada.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+nr1Evidence?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-complete-action]");
+  if (!button) return;
+  try {
+    const data = await request(`/api/preventive-actions/${encodeURIComponent(button.dataset.completeAction)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "Concluida" }),
+    });
+    nr1ReportState = data.report;
+    renderNr1Report(data.report);
+    showToast("Medida marcada como concluida.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
 
 platformCompanyList?.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-save-company]");
@@ -887,6 +1048,7 @@ checkinForm.addEventListener("submit", async (event) => {
     renderDashboard(data.dashboard);
     renderPersonal(data.personal);
     await loadActionPlan();
+    await loadNr1Report();
     checkinForm.reset();
     updateOutputs();
     showToast("Check-in salvo no servidor.");
@@ -952,11 +1114,12 @@ async function boot() {
       updateUserBadge();
       await loadDashboard();
       await loadPersonalReport();
-    await loadUsers();
-    await loadFeedback();
-    await loadHseStatus();
-    await loadActionPlan();
-    await loadPlatformCompanies();
+      await loadUsers();
+      await loadFeedback();
+      await loadHseStatus();
+      await loadActionPlan();
+      await loadNr1Report();
+      await loadPlatformCompanies();
     setRole(currentUser.role === "employee" ? "employee" : "manager", false);
     } else {
       authModal.classList.add("show");

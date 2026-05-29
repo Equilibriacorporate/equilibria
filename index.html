@@ -63,6 +63,10 @@
             <span aria-hidden="true">✓</span>
             Plano RH
           </button>
+          <button class="nav-item" data-section="nr1" type="button">
+            <span aria-hidden="true">N</span>
+            NR-1/PGR
+          </button>
           <button class="nav-item" data-section="assistant" type="button">
             <span aria-hidden="true">✦</span>
             IA de apoio
@@ -377,6 +381,63 @@
             </div>
             <p>Combina check-ins, questionário mensal e voz anônima para sugerir ações preventivas.</p>
             <div class="action-plan-board" id="actionPlanBoard"></div>
+          </article>
+        </section>
+
+        <section class="workspace-section" id="nr1" aria-labelledby="nr1Title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">GRO/PGR psicossocial</p>
+              <h2 id="nr1Title">Riscos NR-1 e medidas preventivas</h2>
+            </div>
+            <span class="status-pill stable">Evidencias auditaveis</span>
+          </div>
+
+          <div class="nr1-layout">
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Matriz de prioridade</h3>
+                <button class="ghost-button" id="nr1ExportButton" type="button">Baixar relatorio</button>
+              </div>
+              <p>Leitura de apoio ao GRO/PGR: inventario de fatores psicossociais, nivel de risco, evidencias e medidas preventivas.</p>
+              <div class="nr1-matrix" id="nr1Matrix"></div>
+              <div class="nr1-risk-list" id="nr1Board"></div>
+            </article>
+
+            <article class="panel soft-panel">
+              <h3>Registrar medida preventiva</h3>
+              <form class="nr1-action-form" id="nr1ActionForm">
+                <label>
+                  Fator de risco
+                  <select name="riskKey" id="nr1RiskKey"></select>
+                </label>
+                <label>
+                  Medida
+                  <textarea name="title" required placeholder="Ex.: revisar escala, reduzir sobrecarga, criar ritual de apoio, comunicar mudancas com antecedencia..."></textarea>
+                </label>
+                <label>
+                  Responsavel
+                  <input name="owner" value="RH + Lideranca direta" />
+                </label>
+                <label>
+                  Prazo
+                  <input name="deadline" value="30 dias" />
+                </label>
+                <label>
+                  Evidencia ou observacao
+                  <textarea name="evidence" placeholder="Informe o dado, relato ou reuniao que justifica a medida."></textarea>
+                </label>
+                <button class="primary-button wide" type="submit">Salvar medida preventiva</button>
+              </form>
+            </article>
+          </div>
+
+          <article class="panel nr1-evidence-panel">
+            <div class="panel-title">
+              <h3>Acoes e linha do tempo</h3>
+              <span>Base para acompanhamento</span>
+            </div>
+            <div class="nr1-evidence" id="nr1Evidence"></div>
           </article>
         </section>
 

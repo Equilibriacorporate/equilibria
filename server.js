@@ -46,6 +46,7 @@ const planCatalog = {
     hasFeedback: false,
     hasHse: false,
     hasActionPlan: false,
+    hasNr1: false,
   },
   Profissional: {
     name: "Profissional",
@@ -56,6 +57,7 @@ const planCatalog = {
     hasFeedback: true,
     hasHse: true,
     hasActionPlan: true,
+    hasNr1: true,
   },
   Enterprise: {
     name: "Enterprise",
@@ -66,6 +68,7 @@ const planCatalog = {
     hasFeedback: true,
     hasHse: true,
     hasActionPlan: true,
+    hasNr1: true,
   },
 };
 
@@ -98,6 +101,39 @@ const hseQuestions = [
   { id: "change_2", dimension: "change", text: "Entendo os motivos das mudanças que afetam minha rotina." },
   { id: "change_3", dimension: "change", text: "Tenho espaço para tirar dúvidas durante mudanças importantes." },
 ];
+
+const psychosocialRiskFactors = {
+  demands: {
+    label: "Demandas e carga de trabalho",
+    source: "Check-ins, questionario mensal e relatos anonimos",
+    measure: "Revisar volume de demandas, prioridades, pausas e dimensionamento da equipe.",
+  },
+  control: {
+    label: "Autonomia e controle sobre a rotina",
+    source: "Questionario mensal tipo HSE",
+    measure: "Dar mais previsibilidade, autonomia de organizacao e participacao em decisoes da rotina.",
+  },
+  support: {
+    label: "Apoio de lideranca e colegas",
+    source: "Check-ins, HSE e plano de acao RH",
+    measure: "Criar rituais de apoio, check-ins de lideranca e canais claros para bloqueios.",
+  },
+  relationships: {
+    label: "Relacionamentos, respeito e conflitos",
+    source: "Voz anonima e HSE",
+    measure: "Abrir escuta segura, tratar conflitos recorrentes e reforcar condutas esperadas.",
+  },
+  role: {
+    label: "Clareza de papel e expectativas",
+    source: "HSE e relatos sobre processos",
+    measure: "Revisar responsabilidades, criterios de sucesso e comunicacao de prioridades.",
+  },
+  change: {
+    label: "Gestao de mudancas",
+    source: "HSE e relatos sobre jornada",
+    measure: "Comunicar mudancas com antecedencia, explicar motivos e registrar duvidas recorrentes.",
+  },
+};
 
 function hashPassword(password, salt) {
   return crypto.createHash("sha256").update(`${salt}:${password}`).digest("hex");
@@ -235,6 +271,7 @@ function createSeedData() {
     checkins: entries,
     consents: [],
     feedback: [],
+    preventiveActions: [],
     hseResponses: [
       {
         id: "hse_demo_1",
@@ -418,6 +455,135 @@ function buildRhActionPlan(db, user) {
       feedbackItems: feedback.length,
     },
     actions: actions.slice(0, 8),
+  };
+}
+
+function riskLevel(score) {
+  if (score >= 75) return "Critico";
+  if (score >= 55) return "Alto";
+  if (score >= 35) return "Medio";
+  return "Baixo";
+}
+
+function probabilityFromScore(score) {
+  if (score >= 75) return 5;
+  if (score >= 55) return 4;
+  if (score >= 35) return 3;
+  if (score >= 20) return 2;
+  return 1;
+}
+
+function severityFromFactor(key, score) {
+  const base = ["relationships", "demands", "support"].includes(key) ? 3 : 2;
+  return Math.min(5, Math.max(1, base + (score >= 70 ? 2 : score >= 45 ? 1 : 0)));
+}
+
+function feedbackScore(feedback = [], key) {
+  const terms = {
+    demands: ["carga", "jornada", "meta", "escala", "prazo", "sobrecarga", "pressao"],
+    control: ["autonomia", "decisao", "prioridade", "controle"],
+    support: ["apoio", "lideranca", "ajuda", "orientacao", "bloqueio"],
+    relationships: ["conflito", "respeito", "assedio", "humilha", "ambiente", "relacao"],
+    role: ["clareza", "papel", "responsabilidade", "funcao", "esperado"],
+    change: ["mudanca", "comunicacao", "antecedencia", "duvida"],
+  }[key] || [];
+  const matched = feedback.filter((item) => {
+    const text = `${item.category || ""} ${item.sentiment || ""} ${item.message || ""}`.toLowerCase();
+    return terms.some((term) => text.includes(term));
+  });
+  return Math.min(30, matched.length * 10 + matched.filter((item) => item.sentiment === "urgente").length * 8);
+}
+
+function buildNr1Report(db, user, month = currentMonthKey()) {
+  const dashboard = buildDashboard(db, user);
+  const hse = buildHseSummary(db, user, month);
+  const feedback = (db.feedback || []).filter((item) => item.companyId === user.companyId);
+  const existingActions = (db.preventiveActions || []).filter((item) => item.companyId === user.companyId);
+  const avgTeamRisk = average(dashboard.teams.filter((team) => !team.sampleProtected).map((team) => team.risk || 0));
+  const avgPressure = average(companyEntries(db, user).map((entry) => entry.pressure * 10));
+  const dimensionsByKey = Object.fromEntries(hse.dimensions.map((dimension) => [dimension.key, dimension]));
+
+  const risks = Object.entries(psychosocialRiskFactors)
+    .map(([key, config]) => {
+      const dimension = dimensionsByKey[key] || { percent: 70, count: 0 };
+      const hseRisk = dimension.count ? 100 - dimension.percent : 25;
+      const operationalRisk = key === "demands" ? Math.max(avgTeamRisk, avgPressure) : key === "support" ? dashboard.metrics.risk : avgTeamRisk * 0.65;
+      const score = Math.round(Math.min(100, Math.max(hseRisk, operationalRisk) + feedbackScore(feedback, key)));
+      const probability = probabilityFromScore(score);
+      const severity = severityFromFactor(key, score);
+      const relatedActions = existingActions.filter((action) => action.riskKey === key && action.status !== "Concluida");
+      return {
+        key,
+        factor: config.label,
+        source: config.source,
+        evidence: [
+          `${dimension.count || 0} resposta(s) HSE no mes ${month}`,
+          `risco coletivo medio ${Math.round(avgTeamRisk || 0)}%`,
+          `${feedback.length} relato(s) anonimo(s) registrados`,
+        ],
+        probability,
+        severity,
+        score: probability * severity,
+        index: score,
+        level: riskLevel(score),
+        recommendedMeasure: config.measure,
+        status: relatedActions.length ? "Em tratamento" : score >= 35 ? "Pendente" : "Monitorado",
+      };
+    })
+    .sort((a, b) => b.index - a.index);
+
+  const generatedActions = risks
+    .filter((risk) => risk.index >= 35)
+    .slice(0, 6)
+    .map((risk) => ({
+      id: `suggested_${risk.key}`,
+      riskKey: risk.key,
+      title: risk.recommendedMeasure,
+      owner: risk.level === "Critico" || risk.level === "Alto" ? "RH + Lideranca direta" : "RH",
+      deadline: risk.level === "Critico" || risk.level === "Alto" ? "7 dias" : "30 dias",
+      status: "Sugerida",
+      evidence: risk.evidence.join("; "),
+      createdAt: new Date().toISOString(),
+      suggested: true,
+    }));
+
+  return {
+    generatedAt: new Date().toISOString(),
+    month,
+    company: dashboard.company.name,
+    disclaimer: "Relatorio de apoio ao GRO/PGR. Nao substitui avaliacao tecnica, juridica, medica ou laudo ocupacional.",
+    summary: {
+      risk: Math.round(dashboard.metrics.risk || 0),
+      hseResponses: hse.count,
+      feedbackItems: feedback.length,
+      openActions: existingActions.filter((action) => action.status !== "Concluida").length,
+    },
+    risks,
+    matrix: {
+      low: risks.filter((risk) => risk.level === "Baixo").length,
+      medium: risks.filter((risk) => risk.level === "Medio").length,
+      high: risks.filter((risk) => risk.level === "Alto").length,
+      critical: risks.filter((risk) => risk.level === "Critico").length,
+    },
+    actions: [...generatedActions, ...existingActions.slice().reverse()],
+    evidenceTimeline: [
+      ...companyEntries(db, user).slice(-8).map((entry) => ({
+        type: "Check-in",
+        date: entry.date,
+        text: `${entry.team}: humor ${entry.mood}/10, energia ${entry.energy}/10, pressao ${entry.pressure}/10.`,
+      })),
+      ...feedback.slice(-6).map((item) => ({
+        type: "Voz anonima",
+        date: item.createdAt,
+        text: `${item.team || "Equipe"}: ${item.category} / ${item.sentiment}.`,
+      })),
+      ...(db.hseResponses || [])
+        .filter((item) => item.companyId === user.companyId)
+        .slice(-6)
+        .map((item) => ({ type: "HSE mensal", date: item.createdAt, text: `${item.team || "Equipe"} respondeu o ciclo ${item.month}.` })),
+    ]
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 12),
   };
 }
 
@@ -938,6 +1104,85 @@ async function routeApi(req, res) {
       return;
     }
 
+    if (req.method === "GET" && url.pathname === "/api/nr1-report") {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      if (!requireFeature(db, user, "hasNr1")) {
+        sendJson(res, 403, { error: "Modulo NR-1/PGR disponivel nos planos Profissional e Enterprise." });
+        return;
+      }
+      sendJson(res, 200, buildNr1Report(db, user, url.searchParams.get("month") || currentMonthKey()));
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/preventive-actions") {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      if (!requireFeature(db, user, "hasNr1")) {
+        sendJson(res, 403, { error: "Modulo NR-1/PGR disponivel nos planos Profissional e Enterprise." });
+        return;
+      }
+      const body = await readBody(req);
+      if (!psychosocialRiskFactors[body.riskKey]) {
+        sendJson(res, 400, { error: "Fator de risco invalido" });
+        return;
+      }
+      if (!String(body.title || "").trim()) {
+        sendJson(res, 400, { error: "Descreva a medida preventiva" });
+        return;
+      }
+      const action = {
+        id: `action_${Date.now()}`,
+        companyId: user.companyId,
+        riskKey: body.riskKey,
+        title: String(body.title).trim(),
+        owner: String(body.owner || "RH").trim(),
+        deadline: String(body.deadline || "30 dias").trim(),
+        status: ["Aberta", "Em andamento", "Concluida"].includes(body.status) ? body.status : "Aberta",
+        evidence: String(body.evidence || "").trim(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.preventiveActions = db.preventiveActions || [];
+      db.preventiveActions.push(action);
+      db.audit.push({ id: `audit_${Date.now()}`, action: "nr1.preventive_action.created", userId: user.id, companyId: user.companyId, date: action.createdAt });
+      writeDb(db);
+      sendJson(res, 201, { action, report: buildNr1Report(db, user) });
+      return;
+    }
+
+    if (req.method === "PATCH" && url.pathname.startsWith("/api/preventive-actions/")) {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      if (!requireFeature(db, user, "hasNr1")) {
+        sendJson(res, 403, { error: "Modulo NR-1/PGR disponivel nos planos Profissional e Enterprise." });
+        return;
+      }
+      const actionId = decodeURIComponent(url.pathname.split("/").pop());
+      const action = (db.preventiveActions || []).find((item) => item.companyId === user.companyId && item.id === actionId);
+      if (!action) {
+        sendJson(res, 404, { error: "Medida preventiva nao encontrada" });
+        return;
+      }
+      const body = await readBody(req);
+      if (body.title !== undefined) action.title = String(body.title).trim();
+      if (body.owner !== undefined) action.owner = String(body.owner).trim();
+      if (body.deadline !== undefined) action.deadline = String(body.deadline).trim();
+      if (body.evidence !== undefined) action.evidence = String(body.evidence).trim();
+      if (["Aberta", "Em andamento", "Concluida"].includes(body.status)) action.status = body.status;
+      action.updatedAt = new Date().toISOString();
+      db.audit.push({ id: `audit_${Date.now()}`, action: "nr1.preventive_action.updated", userId: user.id, companyId: user.companyId, date: action.updatedAt });
+      writeDb(db);
+      sendJson(res, 200, { action, report: buildNr1Report(db, user) });
+      return;
+    }
+
     if (req.method === "POST" && url.pathname === "/api/checkins") {
       const body = await readBody(req);
       const required = ["team", "moment", "mood", "energy", "pressure", "support"];
@@ -1040,6 +1285,7 @@ async function routeApi(req, res) {
           metrics: dashboard.metrics,
           teams: dashboard.teams,
           alerts: dashboard.alerts,
+          nr1: requireManager(user) && requireFeature(db, user, "hasNr1") ? buildNr1Report(db, user) : null,
         },
       });
       return;
@@ -1062,6 +1308,7 @@ async function routeApi(req, res) {
             consents: (db.consents || []).filter((item) => item.companyId === user.companyId),
             feedback: (db.feedback || []).filter((item) => item.companyId === user.companyId),
             hseResponses: (db.hseResponses || []).filter((item) => item.companyId === user.companyId),
+            preventiveActions: (db.preventiveActions || []).filter((item) => item.companyId === user.companyId),
             audit: db.audit.filter((item) => item.companyId === user.companyId || item.userId === user.id),
           },
         },

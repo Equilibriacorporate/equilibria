@@ -899,6 +899,133 @@ textarea {
   font-weight: 800;
 }
 
+.nr1-layout {
+  display: grid;
+  grid-template-columns: minmax(420px, 1.4fr) minmax(320px, 0.8fr);
+  gap: 14px;
+}
+
+.nr1-matrix {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.nr1-matrix article {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.nr1-matrix strong {
+  color: var(--ink);
+  font-size: 1.8rem;
+}
+
+.nr1-matrix span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.nr1-risk-list,
+.nr1-evidence,
+.nr1-actions,
+.nr1-timeline,
+.nr1-action-form {
+  display: grid;
+  gap: 12px;
+}
+
+.nr1-risk-card,
+.nr1-action,
+.nr1-timeline article {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.nr1-risk-head,
+.nr1-action {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.nr1-risk-head strong,
+.nr1-risk-head small,
+.nr1-action strong,
+.nr1-action small {
+  display: block;
+}
+
+.nr1-risk-head small,
+.nr1-action small,
+.nr1-timeline span,
+.legal-note {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.nr1-risk-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.nr1-risk-grid span {
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.nr1-risk-grid b {
+  display: block;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.nr1-risk-card p,
+.nr1-risk-card ul,
+.nr1-timeline p,
+.legal-note {
+  margin: 0;
+}
+
+.nr1-risk-card ul {
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.nr1-action.done {
+  background: var(--green-soft);
+}
+
+.nr1-action-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.nr1-evidence-panel {
+  margin-top: 14px;
+}
+
 .platform-admin-panel {
   display: none;
   margin-top: 14px;
@@ -1396,8 +1523,21 @@ textarea {
   .sales-grid,
   .feedback-grid,
   .admin-grid,
+  .nr1-layout,
   .action-plan-board {
     gap: 12px;
+  }
+
+  .nr1-layout,
+  .nr1-matrix,
+  .nr1-risk-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nr1-risk-head,
+  .nr1-action {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .panel,
