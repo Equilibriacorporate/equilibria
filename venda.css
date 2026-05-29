@@ -100,6 +100,12 @@ nav {
   color: #fff;
 }
 
+.button.whatsapp {
+  box-shadow: inset 0 0 0 1px rgba(37, 211, 102, 0.42);
+  background: #eafaf0;
+  color: #147a3d;
+}
+
 .button.soft,
 .button.ghost {
   background: var(--green-soft);

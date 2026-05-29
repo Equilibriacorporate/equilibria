@@ -11,7 +11,7 @@ const LOGIN_WINDOW_MS = 1000 * 60 * 10;
 const LOGIN_MAX_ATTEMPTS = 8;
 const MIN_TEAM_SAMPLE = Number(globalThis.process?.env?.MIN_TEAM_SAMPLE || 3);
 const OPENAI_API_KEY = globalThis.process?.env?.OPENAI_API_KEY || "";
-const OPENAI_MODEL = globalThis.process?.env?.OPENAI_MODEL || "gpt-5.4-mini";
+const OPENAI_MODEL = globalThis.process?.env?.OPENAI_MODEL || "gpt-4o-mini";
 const OPENAI_TIMEOUT_MS = Number(globalThis.process?.env?.OPENAI_TIMEOUT_MS || 18000);
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(ROOT, "data");
@@ -1443,6 +1443,19 @@ async function routeApi(req, res) {
       return;
     }
 
+    if (req.method === "GET" && url.pathname === "/api/assistant/status") {
+      if (!requireFeature(db, user, "hasAssistant")) {
+        sendJson(res, 403, { error: "IA de apoio disponível nos planos Profissional e Enterprise." });
+        return;
+      }
+      sendJson(res, 200, {
+        configured: Boolean(OPENAI_API_KEY),
+        model: OPENAI_MODEL,
+        mode: OPENAI_API_KEY ? "openai" : "local",
+      });
+      return;
+    }
+
     if (req.method === "POST" && url.pathname === "/api/assistant") {
       if (!requireFeature(db, user, "hasAssistant")) {
         sendJson(res, 403, { error: "IA de apoio disponível nos planos Profissional e Enterprise." });
@@ -1628,6 +1641,7 @@ function buildAssistantContext(db, user) {
   const entries = companyEntries(db, user).filter((entry) => entry.userId === user.id).slice(-5);
   const latest = entries.slice(-1)[0];
   const personal = buildPersonalReport(db, user);
+  const teamData = teamSummaries(db, user).find((team) => team.team === user.team && !team.sampleProtected);
   return {
     role: user.role,
     team: user.team,
@@ -1641,6 +1655,15 @@ function buildAssistantContext(db, user) {
           note: latest.note,
         }
       : null,
+    teamSignals: teamData
+      ? {
+          mood: teamData.mood,
+          energy: teamData.energy,
+          pressure: teamData.pressure,
+          support: teamData.support,
+          risk: teamData.risk,
+        }
+      : null,
     recentPersonalSignals: personal.items.slice(0, 3),
   };
 }
@@ -1648,11 +1671,13 @@ function buildAssistantContext(db, user) {
 function assistantSystemPrompt() {
   return [
     "Voce e a IA de apoio interno do Equilibria, uma plataforma de gestao emocional corporativa.",
-    "Responda em portugues do Brasil, com tom humano, acolhedor, direto e pouco mecanico.",
+    "Responda em portugues do Brasil, como uma conversa real: humano, especifico, acolhedor, direto e nada robotico.",
     "Nao faca diagnostico clinico, nao prometa tratamento e nao substitua psicologo, medico, RH ou emergencia.",
     "Ajude a pessoa a organizar o que sente, identificar gatilhos do trabalho, pensar no proximo passo e, quando adequado, sugerir uso de RH, lideranca segura, compliance ou canal anonimo.",
     "Se houver risco de autoagressao, violencia, abuso, assedio grave, dor no peito, falta de ar intensa ou perigo imediato, oriente procurar ajuda imediata/emergencia e uma pessoa de confianca.",
-    "Evite respostas genericas. Use detalhes da mensagem e do contexto. Prefira 2 a 4 paragrafos curtos e uma pergunta final util.",
+    "Evite respostas genericas, listas longas e frases prontas. Use detalhes da mensagem e do contexto.",
+    "Estruture a resposta em: acolhimento breve, leitura do que pode estar acontecendo, uma acao pratica para hoje, e uma pergunta final util.",
+    "Prefira 2 a 4 paragrafos curtos. Nao mencione que recebeu JSON ou contexto tecnico.",
   ].join("\n");
 }
 

@@ -17,7 +17,7 @@ services:
       - key: MIN_TEAM_SAMPLE
         value: 3
       - key: OPENAI_MODEL
-        value: gpt-5.4-mini
+        value: gpt-4o-mini
       - key: OPENAI_TIMEOUT_MS
         value: 18000
     disk:

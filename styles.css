@@ -402,6 +402,34 @@ h3 {
   margin-bottom: 14px;
 }
 
+.executive-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.executive-card {
+  display: grid;
+  gap: 8px;
+  min-height: 132px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff, var(--green-soft));
+}
+
+.executive-card span,
+.executive-card small {
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.executive-card strong {
+  color: var(--ink);
+  font-size: 1.35rem;
+}
+
 .metric-card,
 .panel,
 .checkin-form,
@@ -706,6 +734,23 @@ textarea {
   display: grid;
   gap: 10px;
   max-width: 980px;
+}
+
+.ai-status-bar {
+  width: fit-content;
+  max-width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.ai-status-bar.is-openai {
+  background: var(--green-soft);
+  color: var(--green);
 }
 
 .feedback-grid {
@@ -1634,6 +1679,7 @@ textarea {
   }
 
   .metric-grid,
+  .executive-summary-grid,
   .slider-stack,
   .team-row {
     grid-template-columns: 1fr;

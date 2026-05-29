@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#5a8f7b" />
     <meta
       name="description"
-      content="Equilibria, sistema de gestão emocional corporativa para check-ins, relatórios, alertas e prevenção de burnout."
+      content="Equilibria, sistema de gestão emocional corporativa para check-ins, relatórios, alertas e sinais de risco emocional."
     />
     <title>Equilibria | Gestão emocional corporativa</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -103,7 +103,7 @@
         <header class="topbar">
           <div>
             <p class="eyebrow">MVP vendável</p>
-            <h1>Plataforma de prevenção emocional para empresas</h1>
+            <h1>Gestão emocional corporativa com visão clara para RH</h1>
           </div>
           <div class="account-panel">
             <span id="currentUser">Conectando...</span>
@@ -118,9 +118,9 @@
         <section class="hero-band">
           <div class="hero-copy">
             <p class="eyebrow">Radar preventivo</p>
-            <h2>Check-ins diários viram inteligência de cuidado, gestão e prevenção.</h2>
+            <h2>Identifique sinais de risco emocional antes que virem afastamento.</h2>
             <p>
-              O Equilibria acompanha humor, energia, pressão percebida e apoio recebido. O colaborador ganha clareza pessoal; a empresa enxerga sinais coletivos antes que virem afastamento, turnover ou queda de desempenho.
+              O Equilibria acompanha humor, energia, pressão percebida e apoio recebido. O colaborador ganha clareza pessoal; a empresa enxerga sinais coletivos para orientar decisões de cuidado, jornada e liderança.
             </p>
             <div class="hero-actions">
               <button class="primary-button" data-open-checkin type="button">Fazer check-in</button>
@@ -157,7 +157,7 @@
               <small>queda leve no fim do dia</small>
             </article>
             <article class="metric-card warning">
-              <span>Risco de burnout</span>
+              <span>Sinais de risco</span>
               <strong id="burnoutRisk">22%</strong>
               <small id="riskDetail">3 sinais exigem atenção</small>
             </article>
@@ -165,6 +165,24 @@
               <span>Adesão ao check-in</span>
               <strong id="checkinRate">84%</strong>
               <small id="checkinDetail">118 respostas no mês</small>
+            </article>
+          </div>
+
+          <div class="executive-summary-grid">
+            <article class="executive-card">
+              <span>Prioridade agora</span>
+              <strong id="topRiskTeam">Calculando...</strong>
+              <small id="topRiskAction">Acompanhe a equipe com maior sinal agregado.</small>
+            </article>
+            <article class="executive-card">
+              <span>NR-1/PGR</span>
+              <strong id="nr1Readiness">Em acompanhamento</strong>
+              <small>Inventário e medidas preventivas disponíveis no menu NR-1/PGR.</small>
+            </article>
+            <article class="executive-card">
+              <span>Próxima ação</span>
+              <strong id="nextBestAction">Abrir Plano RH</strong>
+              <small>Use dados agregados para orientar lideranca e jornada.</small>
             </article>
           </div>
 
@@ -455,6 +473,7 @@
           </div>
 
           <div class="assistant-layout">
+            <div class="ai-status-bar" id="aiStatusBar">IA: verificando conexao...</div>
             <article class="chat-panel" id="chatPanel" aria-live="polite"></article>
             <form class="assistant-form" id="assistantForm">
               <input aria-label="Mensagem para IA" name="message" placeholder="Conte brevemente como está se sentindo..." />

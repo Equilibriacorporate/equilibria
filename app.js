@@ -14,6 +14,7 @@ const sections = document.querySelectorAll(".workspace-section");
 const checkinForm = document.querySelector("#checkinForm");
 const assistantForm = document.querySelector("#assistantForm");
 const chatPanel = document.querySelector("#chatPanel");
+const aiStatusBar = document.querySelector("#aiStatusBar");
 const toast = document.querySelector("#toast");
 const employeeCount = document.querySelector("#employeeCount");
 const employeeOutput = document.querySelector("#employeeOutput");
@@ -150,6 +151,7 @@ async function loginWithCredentials(email, password, acceptedLegal = false) {
   await loadPlatformCompanies();
   await loadGovernance();
   await loadAuditLogs();
+  await loadAssistantStatus();
   setRole(currentUser.role === "employee" ? "employee" : "manager", false);
   showToast(`Conectado como ${currentUser.name}.`);
 }
@@ -262,6 +264,21 @@ async function loadActionPlan() {
     renderActionPlan(data);
   } catch (error) {
     actionPlanBoard.innerHTML = `<p>${error.message}</p>`;
+  }
+}
+
+async function loadAssistantStatus() {
+  if (!aiStatusBar) return;
+  if (!currentUser) {
+    aiStatusBar.textContent = "IA: aguardando login.";
+    return;
+  }
+  try {
+    const data = await request("/api/assistant/status");
+    aiStatusBar.textContent = data.configured ? `IA: GPT ativo (${data.model})` : "IA: modo local ativo. Configure OPENAI_API_KEY no Render.";
+    aiStatusBar.classList.toggle("is-openai", Boolean(data.configured));
+  } catch (error) {
+    aiStatusBar.textContent = error.message;
   }
 }
 
@@ -687,6 +704,16 @@ function renderDashboard(data) {
   document.querySelector("#riskDetail").textContent = metrics.risk >= 45 ? "atenção prioritária" : "sinais sob monitoramento";
   document.querySelector("#riskSummary").textContent = metrics.risk >= 45 ? "Risco coletivo elevado" : "Risco moderado controlado";
   document.querySelector("#pulseScore").textContent = percent(Math.max(1, 100 - metrics.risk));
+  const visibleTeams = teams.filter((team) => !team.sampleProtected);
+  const topTeam = visibleTeams.slice().sort((a, b) => (b.risk || 0) - (a.risk || 0))[0];
+  const topRiskTeam = document.querySelector("#topRiskTeam");
+  const topRiskAction = document.querySelector("#topRiskAction");
+  const nr1Readiness = document.querySelector("#nr1Readiness");
+  const nextBestAction = document.querySelector("#nextBestAction");
+  if (topRiskTeam) topRiskTeam.textContent = topTeam ? `${topTeam.team} Â· ${topTeam.risk}%` : "Amostra protegida";
+  if (topRiskAction) topRiskAction.textContent = topTeam && topTeam.risk >= 45 ? "Abrir escuta com lideranca e revisar carga em ate 7 dias." : "Manter check-ins e observar tendencia semanal.";
+  if (nr1Readiness) nr1Readiness.textContent = metrics.count >= 10 ? "Evidencias em formacao" : "Coletar mais sinais";
+  if (nextBestAction) nextBestAction.textContent = metrics.risk >= 45 ? "Acionar Plano RH" : "Revisar NR-1/PGR";
 
   renderAlerts(alerts);
   renderTeams(teams);
@@ -1300,6 +1327,10 @@ assistantForm.addEventListener("submit", async (event) => {
       body: JSON.stringify({ message: text }),
     });
     addMessage(data.reply);
+    if (aiStatusBar) {
+      aiStatusBar.textContent = data.source === "openai" ? `IA: resposta via GPT (${data.model})` : "IA: resposta em modo local. Verifique a chave da OpenAI no Render.";
+      aiStatusBar.classList.toggle("is-openai", data.source === "openai");
+    }
   } catch (error) {
     addMessage("Não consegui responder agora. Tente novamente em instantes.");
   }
@@ -1352,6 +1383,7 @@ async function boot() {
       await loadPlatformCompanies();
       await loadGovernance();
       await loadAuditLogs();
+      await loadAssistantStatus();
       setRole(currentUser.role === "employee" ? "employee" : "manager", false);
     } else {
       authModal.classList.add("show");
