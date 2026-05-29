@@ -714,6 +714,62 @@ textarea {
   gap: 14px;
 }
 
+.onboarding-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.onboarding-checklist {
+  display: grid;
+  gap: 10px;
+}
+
+.onboarding-checklist label {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--ink);
+  font-weight: 850;
+}
+
+.onboarding-checklist input {
+  margin-top: 2px;
+}
+
+.onboarding-steps li {
+  margin-bottom: 12px;
+}
+
+.message-template {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--green-soft);
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.operation-mode-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.operation-mode-grid article {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
 .soft-panel {
   background: linear-gradient(180deg, #ffffff, #fffdf9);
 }
@@ -1597,6 +1653,7 @@ textarea {
   .report-grid,
   .sales-grid,
   .feedback-grid,
+  .onboarding-layout,
   .admin-grid,
   .nr1-layout,
   .action-plan-board {

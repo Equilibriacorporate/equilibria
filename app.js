@@ -56,6 +56,11 @@ const applyRetentionButton = document.querySelector("#applyRetentionButton");
 const purgeDataForm = document.querySelector("#purgeDataForm");
 const auditLogList = document.querySelector("#auditLogList");
 const refreshAuditButton = document.querySelector("#refreshAuditButton");
+const onboardingChecklist = document.querySelector("#onboardingChecklist");
+const onboardingProgress = document.querySelector("#onboardingProgress");
+const onboardingStatus = document.querySelector("#onboardingStatus");
+const copyOnboardingMessage = document.querySelector("#copyOnboardingMessage");
+const onboardingMessage = document.querySelector("#onboardingMessage");
 
 let hseQuestions = [];
 let nr1ReportState = null;
@@ -436,6 +441,29 @@ function labelAuditAction(action) {
     "nr1.preventive_action.created": "Medida NR-1 criada",
     "nr1.preventive_action.updated": "Medida NR-1 atualizada",
   }[action] || action;
+}
+
+function loadOnboardingState() {
+  if (!onboardingChecklist) return;
+  const saved = JSON.parse(localStorage.getItem("equilibria_onboarding") || "{}");
+  onboardingChecklist.querySelectorAll("[data-onboarding-item]").forEach((input) => {
+    input.checked = Boolean(saved[input.dataset.onboardingItem]);
+  });
+  updateOnboardingProgress();
+}
+
+function updateOnboardingProgress() {
+  if (!onboardingChecklist || !onboardingProgress) return;
+  const inputs = Array.from(onboardingChecklist.querySelectorAll("[data-onboarding-item]"));
+  const done = inputs.filter((input) => input.checked).length;
+  const total = inputs.length;
+  const saved = Object.fromEntries(inputs.map((input) => [input.dataset.onboardingItem, input.checked]));
+  localStorage.setItem("equilibria_onboarding", JSON.stringify(saved));
+  onboardingProgress.textContent = `${done}/${total} concluÃ­dos`;
+  if (onboardingStatus) {
+    onboardingStatus.textContent = done === total ? "Pronto para operar" : done >= 5 ? "Quase pronto" : "Pronto para piloto";
+    onboardingStatus.className = `status-pill ${done === total ? "stable" : "private"}`;
+  }
 }
 
 function renderHseQuestions(questions, alreadyAnswered) {
@@ -1051,6 +1079,16 @@ hseForm?.addEventListener("submit", async (event) => {
 refreshActionPlan?.addEventListener("click", loadActionPlan);
 refreshPlatformCompanies?.addEventListener("click", loadPlatformCompanies);
 refreshAuditButton?.addEventListener("click", loadAuditLogs);
+onboardingChecklist?.addEventListener("change", updateOnboardingProgress);
+copyOnboardingMessage?.addEventListener("click", async () => {
+  const text = onboardingMessage?.textContent?.trim() || "";
+  try {
+    await navigator.clipboard?.writeText(text);
+    showToast("Mensagem de convite copiada.");
+  } catch {
+    showToast("Mensagem pronta para copiar manualmente.");
+  }
+});
 
 passwordForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -1297,6 +1335,7 @@ logoutButton.addEventListener("click", async () => {
 async function boot() {
   updateOutputs();
   updatePricing();
+  loadOnboardingState();
   addMessage("Olá. Sou uma primeira escuta de apoio. Não faço diagnóstico e não substituo cuidado profissional, mas posso ajudar a organizar o próximo passo com calma.");
   try {
     if (authToken) {

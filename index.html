@@ -79,6 +79,10 @@
             <span aria-hidden="true">$</span>
             Venda
           </button>
+          <button class="nav-item" data-section="onboarding" type="button">
+            <span aria-hidden="true">1</span>
+            ImplantaÃ§Ã£o
+          </button>
           <button class="nav-item" data-section="governance" type="button">
             <span aria-hidden="true">§</span>
             Governança
@@ -618,6 +622,74 @@
           </div>
         </section>
 
+        <section class="workspace-section" id="onboarding" aria-labelledby="onboardingTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Cliente real</p>
+              <h2 id="onboardingTitle">ImplantaÃ§Ã£o da empresa</h2>
+            </div>
+            <span class="status-pill stable" id="onboardingStatus">Pronto para piloto</span>
+          </div>
+
+          <div class="onboarding-layout">
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Checklist de ativaÃ§Ã£o</h3>
+                <span id="onboardingProgress">0/8 concluÃ­dos</span>
+              </div>
+              <div class="onboarding-checklist" id="onboardingChecklist">
+                <label><input type="checkbox" data-onboarding-item="company" /> Empresa criada com CNPJ e responsÃ¡vel definido.</label>
+                <label><input type="checkbox" data-onboarding-item="legal" /> Termos, privacidade e consentimento apresentados aos usuÃ¡rios.</label>
+                <label><input type="checkbox" data-onboarding-item="teams" /> Equipes cadastradas no painel administrativo.</label>
+                <label><input type="checkbox" data-onboarding-item="users" /> Colaboradores ou gestores cadastrados.</label>
+                <label><input type="checkbox" data-onboarding-item="hse" /> HSE mensal explicado para a equipe.</label>
+                <label><input type="checkbox" data-onboarding-item="voice" /> Canal anÃ´nimo comunicado como espaÃ§o seguro.</label>
+                <label><input type="checkbox" data-onboarding-item="rh" /> RH responsÃ¡vel pelo acompanhamento definido.</label>
+                <label><input type="checkbox" data-onboarding-item="report" /> Data da primeira devolutiva mensal agendada.</label>
+              </div>
+              <button class="primary-button wide" id="copyOnboardingMessage" type="button">Copiar mensagem de convite</button>
+            </article>
+
+            <article class="panel soft-panel">
+              <h3>Como comeÃ§ar em 7 dias</h3>
+              <ol class="clean-list onboarding-steps">
+                <li><strong>Dia 1:</strong> criar empresa, revisar plano e cadastrar RH/Gestor.</li>
+                <li><strong>Dia 2:</strong> cadastrar equipe piloto e enviar mensagem de apresentaÃ§Ã£o.</li>
+                <li><strong>Dias 3 a 5:</strong> estimular check-in de entrada e saÃ­da.</li>
+                <li><strong>Dia 6:</strong> abrir HSE mensal e canal anÃ´nimo.</li>
+                <li><strong>Dia 7:</strong> RH revisa dashboard, NR-1/PGR e Plano RH.</li>
+              </ol>
+            </article>
+          </div>
+
+          <div class="onboarding-layout">
+            <article class="panel">
+              <h3>Mensagem pronta para colaboradores</h3>
+              <div class="message-template" id="onboardingMessage">
+                OlÃ¡! A empresa iniciarÃ¡ um piloto do Equilibria, uma plataforma de apoio Ã  saÃºde emocional corporativa. VocÃª poderÃ¡ registrar como se sente ao iniciar e encerrar o expediente, usar a IA de apoio e enviar relatos anÃ´nimos sobre a jornada. Os dados para RH serÃ£o tratados de forma agregada, com foco em prevenÃ§Ã£o, melhoria da rotina e cuidado com a equipe. Antes de usar, leia e aceite os Termos de Uso e a PolÃ­tica de Privacidade dentro da plataforma.
+              </div>
+            </article>
+
+            <article class="panel">
+              <h3>Demo x operaÃ§Ã£o real</h3>
+              <div class="operation-mode-grid">
+                <article>
+                  <strong>Use demo para vender</strong>
+                  <span>Contas `@equilibria.demo` servem para apresentaÃ§Ã£o, testes e treinamento.</span>
+                </article>
+                <article>
+                  <strong>Use empresa criada para cliente</strong>
+                  <span>Cada cliente deve criar sua prÃ³pria empresa, usuÃ¡rios, aceite e dados separados.</span>
+                </article>
+                <article>
+                  <strong>Evite dados reais na demo</strong>
+                  <span>Dados reais devem ficar apenas na conta da empresa cliente, com consentimento registrado.</span>
+                </article>
+              </div>
+            </article>
+          </div>
+        </section>
+
         <section class="workspace-section" id="governance" aria-labelledby="governanceTitle">
           <div class="section-heading">
             <div>
@@ -756,6 +828,10 @@
       <button class="nav-item mobile-tab" data-section="personal" type="button">
         <span aria-hidden="true">◎</span>
         Relatório
+      </button>
+      <button class="nav-item mobile-tab" data-section="onboarding" type="button">
+        <span aria-hidden="true">1</span>
+        Impl.
       </button>
     </nav>
 
