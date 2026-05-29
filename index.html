@@ -691,6 +691,44 @@
               </div>
               <div class="user-list" id="userList"></div>
             </article>
+
+            <article class="panel">
+              <h3>Controle de senha</h3>
+              <form class="admin-form" id="passwordForm">
+                <label>Senha atual <input name="currentPassword" required type="password" /></label>
+                <label>Nova senha <input name="newPassword" minlength="8" required type="password" /></label>
+                <button class="primary-button wide" type="submit">Alterar minha senha</button>
+              </form>
+              <form class="admin-form" id="resetPasswordForm">
+                <label>UsuÃ¡rio
+                  <select name="userId" id="resetPasswordUser"></select>
+                </label>
+                <label>Nova senha temporÃ¡ria <input name="newPassword" minlength="8" required type="password" value="Temporaria123" /></label>
+                <button class="ghost-button wide" type="submit">Redefinir senha do usuÃ¡rio</button>
+              </form>
+            </article>
+
+            <article class="panel">
+              <h3>RetenÃ§Ã£o e exclusÃ£o de dados</h3>
+              <form class="admin-form" id="governanceForm">
+                <label>RetenÃ§Ã£o de dados operacionais em dias <input id="retentionDaysInput" name="retentionDays" min="30" max="1825" type="number" value="180" /></label>
+                <button class="primary-button wide" type="submit">Salvar polÃ­tica de retenÃ§Ã£o</button>
+              </form>
+              <div class="governance-counts" id="governanceCounts"></div>
+              <button class="ghost-button wide" id="applyRetentionButton" type="button">Aplicar retenÃ§Ã£o agora</button>
+              <form class="admin-form danger-zone" id="purgeDataForm">
+                <label>Para excluir dados operacionais, digite EXCLUIR DADOS <input name="confirmation" placeholder="EXCLUIR DADOS" /></label>
+                <button class="ghost-button wide danger-button" type="submit">Excluir dados operacionais</button>
+              </form>
+            </article>
+
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Logs administrativos</h3>
+                <button class="ghost-button" id="refreshAuditButton" type="button">Atualizar logs</button>
+              </div>
+              <div class="audit-log-list" id="auditLogList"></div>
+            </article>
           </div>
         </section>
       </main>

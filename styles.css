@@ -1065,7 +1065,7 @@ textarea {
 
 .platform-company-controls {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1084,6 +1084,54 @@ textarea {
   padding: 0 10px;
   background: #ffffff;
   color: var(--ink);
+}
+
+.governance-counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.governance-counts article,
+.audit-log-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.governance-counts strong {
+  color: var(--ink);
+  font-size: 1.4rem;
+}
+
+.governance-counts span,
+.audit-log-item span,
+.audit-log-item small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.audit-log-list {
+  display: grid;
+  gap: 10px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.danger-zone {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.danger-button {
+  border-color: rgba(184, 111, 114, 0.45);
+  color: var(--rose);
 }
 
 .chat-panel {
@@ -1581,7 +1629,8 @@ textarea {
   }
 
   .platform-company-head,
-  .platform-company-controls {
+  .platform-company-controls,
+  .governance-counts {
     grid-template-columns: 1fr;
   }
 

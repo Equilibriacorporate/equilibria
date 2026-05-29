@@ -46,6 +46,16 @@ const nr1Evidence = document.querySelector("#nr1Evidence");
 const nr1ActionForm = document.querySelector("#nr1ActionForm");
 const nr1RiskKey = document.querySelector("#nr1RiskKey");
 const nr1ExportButton = document.querySelector("#nr1ExportButton");
+const passwordForm = document.querySelector("#passwordForm");
+const resetPasswordForm = document.querySelector("#resetPasswordForm");
+const resetPasswordUser = document.querySelector("#resetPasswordUser");
+const governanceForm = document.querySelector("#governanceForm");
+const retentionDaysInput = document.querySelector("#retentionDaysInput");
+const governanceCounts = document.querySelector("#governanceCounts");
+const applyRetentionButton = document.querySelector("#applyRetentionButton");
+const purgeDataForm = document.querySelector("#purgeDataForm");
+const auditLogList = document.querySelector("#auditLogList");
+const refreshAuditButton = document.querySelector("#refreshAuditButton");
 
 let hseQuestions = [];
 let nr1ReportState = null;
@@ -133,6 +143,8 @@ async function loginWithCredentials(email, password) {
   await loadActionPlan();
   await loadNr1Report();
   await loadPlatformCompanies();
+  await loadGovernance();
+  await loadAuditLogs();
   setRole(currentUser.role === "employee" ? "employee" : "manager", false);
   showToast(`Conectado como ${currentUser.name}.`);
 }
@@ -161,6 +173,8 @@ async function registerCompany(formData) {
   await loadActionPlan();
   await loadNr1Report();
   await loadPlatformCompanies();
+  await loadGovernance();
+  await loadAuditLogs();
   setRole("manager", false);
   showToast("Empresa criada. Você entrou como administrador.");
 }
@@ -276,6 +290,35 @@ async function loadPlatformCompanies() {
   }
 }
 
+async function loadGovernance() {
+  if (!governanceCounts) return;
+  if (!currentUser || currentUser.role === "employee") {
+    governanceCounts.innerHTML = "<p>DisponÃ­vel para RH/Gestor.</p>";
+    return;
+  }
+  try {
+    const data = await request("/api/admin/governance");
+    if (retentionDaysInput) retentionDaysInput.value = data.company.retentionDays || 180;
+    renderGovernanceCounts(data.counts || {});
+  } catch (error) {
+    governanceCounts.innerHTML = `<p>${error.message}</p>`;
+  }
+}
+
+async function loadAuditLogs() {
+  if (!auditLogList) return;
+  if (!currentUser || currentUser.role === "employee") {
+    auditLogList.innerHTML = "<p>DisponÃ­vel para RH/Gestor.</p>";
+    return;
+  }
+  try {
+    const data = await request("/api/admin/audit");
+    renderAuditLogs(data.logs || []);
+  } catch (error) {
+    auditLogList.innerHTML = `<p>${error.message}</p>`;
+  }
+}
+
 function renderPlatformCompanies(companies) {
   if (!companies.length) {
     platformCompanyList.innerHTML = "<p>Nenhuma empresa cadastrada ainda.</p>";
@@ -320,6 +363,10 @@ function renderPlatformCompanies(companies) {
               Colaboradores
               <input name="employeeCount" min="1" type="number" value="${company.employeeCount || company.users || 1}" />
             </label>
+            <label>
+              RetenÃ§Ã£o
+              <input name="retentionDays" min="30" max="1825" type="number" value="${company.retentionDays || 180}" />
+            </label>
           </div>
           <button class="primary-button wide" data-save-company="${company.id}" type="button">Salvar cliente</button>
         </article>
@@ -335,6 +382,58 @@ function labelCompanyStatus(status) {
     paused: "Pausado",
     cancelled: "Cancelado",
   }[status] || "Ativo";
+}
+
+function renderGovernanceCounts(counts) {
+  const labels = {
+    checkins: "Check-ins",
+    consents: "Consentimentos",
+    feedback: "Relatos",
+    hseResponses: "HSE",
+    preventiveActions: "AÃ§Ãµes NR-1",
+    audit: "Logs",
+  };
+  governanceCounts.innerHTML = Object.entries(labels)
+    .map(([key, label]) => `<article><strong>${counts[key] || 0}</strong><span>${label}</span></article>`)
+    .join("");
+}
+
+function renderAuditLogs(logs) {
+  if (!logs.length) {
+    auditLogList.innerHTML = "<p>Nenhum log administrativo registrado ainda.</p>";
+    return;
+  }
+  auditLogList.innerHTML = logs
+    .map(
+      (log) => `
+        <article class="audit-log-item">
+          <strong>${escapeHtml(labelAuditAction(log.action))}</strong>
+          <span>${new Date(log.date).toLocaleString("pt-BR")}</span>
+          <small>${escapeHtml(log.action)}${log.targetUserId ? ` Â· alvo: ${escapeHtml(log.targetUserId)}` : ""}</small>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function labelAuditAction(action) {
+  return {
+    "account.password.changed": "Senha alterada",
+    "user.password.reset": "Senha redefinida pelo RH",
+    "governance.retention.updated": "PolÃ­tica de retenÃ§Ã£o atualizada",
+    "governance.retention.applied": "RetenÃ§Ã£o aplicada",
+    "company.operational_data.purged": "Dados operacionais excluÃ­dos",
+    "consent.recorded": "Consentimento registrado",
+    "user.created": "UsuÃ¡rio criado",
+    "company.created": "Empresa criada",
+    "company.plan.updated": "Plano atualizado",
+    "platform.company.updated": "Cliente atualizado",
+    "checkin.created": "Check-in registrado",
+    "feedback.created": "Relato anÃ´nimo registrado",
+    "hse.response.created": "HSE respondido",
+    "nr1.preventive_action.created": "Medida NR-1 criada",
+    "nr1.preventive_action.updated": "Medida NR-1 atualizada",
+  }[action] || action;
 }
 
 function renderHseQuestions(questions, alreadyAnswered) {
@@ -529,6 +628,9 @@ function escapeHtml(value) {
 }
 
 function renderUsers(users) {
+  if (resetPasswordUser) {
+    resetPasswordUser.innerHTML = users.map((user) => `<option value="${user.id}">${escapeHtml(user.name)} Â· ${escapeHtml(user.email)}</option>`).join("");
+  }
   userList.innerHTML = users
     .map(
       (user) => `
@@ -865,6 +967,7 @@ userForm.addEventListener("submit", async (event) => {
     });
     renderUsers(data.users);
     userForm.reset();
+    await loadAuditLogs();
     showToast("Usuário criado com sucesso.");
   } catch (error) {
     showToast(error.message);
@@ -945,6 +1048,91 @@ hseForm?.addEventListener("submit", async (event) => {
 
 refreshActionPlan?.addEventListener("click", loadActionPlan);
 refreshPlatformCompanies?.addEventListener("click", loadPlatformCompanies);
+refreshAuditButton?.addEventListener("click", loadAuditLogs);
+
+passwordForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(passwordForm);
+  try {
+    await request("/api/account/password", {
+      method: "POST",
+      body: JSON.stringify({
+        currentPassword: formData.get("currentPassword"),
+        newPassword: formData.get("newPassword"),
+      }),
+    });
+    passwordForm.reset();
+    await loadAuditLogs();
+    showToast("Senha alterada com sucesso.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+resetPasswordForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(resetPasswordForm);
+  try {
+    await request(`/api/users/${encodeURIComponent(formData.get("userId"))}/password`, {
+      method: "PATCH",
+      body: JSON.stringify({ newPassword: formData.get("newPassword") }),
+    });
+    resetPasswordForm.reset();
+    await loadAuditLogs();
+    showToast("Senha do usuÃ¡rio redefinida.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+governanceForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(governanceForm);
+  try {
+    const data = await request("/api/admin/governance", {
+      method: "PATCH",
+      body: JSON.stringify({ retentionDays: Number(formData.get("retentionDays")) }),
+    });
+    renderGovernanceCounts(data.counts || {});
+    await loadAuditLogs();
+    showToast("PolÃ­tica de retenÃ§Ã£o salva.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+applyRetentionButton?.addEventListener("click", async () => {
+  try {
+    const data = await request("/api/admin/apply-retention", { method: "POST", body: "{}" });
+    renderGovernanceCounts(data.counts || {});
+    await loadAuditLogs();
+    showToast("RetenÃ§Ã£o aplicada.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+purgeDataForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(purgeDataForm);
+  try {
+    const data = await request("/api/admin/purge-company-data", {
+      method: "POST",
+      body: JSON.stringify({ confirmation: formData.get("confirmation") }),
+    });
+    renderGovernanceCounts(data.counts || {});
+    purgeDataForm.reset();
+    await loadDashboard();
+    await loadFeedback();
+    await loadHseStatus();
+    await loadActionPlan();
+    await loadNr1Report();
+    await loadAuditLogs();
+    showToast("Dados operacionais excluÃ­dos.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
 nr1ExportButton?.addEventListener("click", async () => {
   try {
     const data = nr1ReportState || (await request("/api/nr1-report"));
@@ -1013,6 +1201,7 @@ platformCompanyList?.addEventListener("click", async (event) => {
         status: card.querySelector('[name="status"]').value,
         expiresAt: card.querySelector('[name="expiresAt"]').value,
         employeeCount: Number(card.querySelector('[name="employeeCount"]').value),
+        retentionDays: Number(card.querySelector('[name="retentionDays"]').value),
       }),
     });
     await loadPlatformCompanies();
@@ -1120,7 +1309,9 @@ async function boot() {
       await loadActionPlan();
       await loadNr1Report();
       await loadPlatformCompanies();
-    setRole(currentUser.role === "employee" ? "employee" : "manager", false);
+      await loadGovernance();
+      await loadAuditLogs();
+      setRole(currentUser.role === "employee" ? "employee" : "manager", false);
     } else {
       authModal.classList.add("show");
     }

@@ -267,6 +267,7 @@ function createSeedData() {
         status: "trial",
         expiresAt: "2026-06-30",
         employeeCount: 100,
+        retentionDays: 180,
         teams: ["Atendimento", "Comercial", "Produto", "Operações", "Financeiro"],
       },
     ],
@@ -306,6 +307,59 @@ function readDb() {
 
 function writeDb(db) {
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf8");
+}
+
+function addAudit(db, { action, userId = "", companyId = "", targetUserId = "", changes = {}, detail = "" }) {
+  db.audit = db.audit || [];
+  db.audit.push({
+    id: `audit_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
+    action,
+    userId,
+    companyId,
+    targetUserId,
+    changes,
+    detail,
+    date: new Date().toISOString(),
+  });
+}
+
+function companyDataCounts(db, companyId) {
+  return {
+    checkins: (db.checkins || []).filter((item) => item.companyId === companyId).length,
+    consents: (db.consents || []).filter((item) => item.companyId === companyId).length,
+    feedback: (db.feedback || []).filter((item) => item.companyId === companyId).length,
+    hseResponses: (db.hseResponses || []).filter((item) => item.companyId === companyId).length,
+    preventiveActions: (db.preventiveActions || []).filter((item) => item.companyId === companyId).length,
+    audit: (db.audit || []).filter((item) => item.companyId === companyId).length,
+  };
+}
+
+function purgeCompanyOperationalData(db, companyId, { keepAudit = true } = {}) {
+  const before = companyDataCounts(db, companyId);
+  db.checkins = (db.checkins || []).filter((item) => item.companyId !== companyId);
+  db.consents = (db.consents || []).filter((item) => item.companyId !== companyId);
+  db.feedback = (db.feedback || []).filter((item) => item.companyId !== companyId);
+  db.hseResponses = (db.hseResponses || []).filter((item) => item.companyId !== companyId);
+  db.preventiveActions = (db.preventiveActions || []).filter((item) => item.companyId !== companyId);
+  if (!keepAudit) db.audit = (db.audit || []).filter((item) => item.companyId !== companyId);
+  return before;
+}
+
+function applyRetentionPolicy(db, companyId, retentionDays) {
+  const cutoff = Date.now() - Number(retentionDays || 180) * 24 * 60 * 60 * 1000;
+  const isRecent = (item) => new Date(item.date || item.createdAt || item.updatedAt || 0).getTime() >= cutoff;
+  const before = companyDataCounts(db, companyId);
+  db.checkins = (db.checkins || []).filter((item) => item.companyId !== companyId || isRecent(item));
+  db.consents = (db.consents || []).filter((item) => item.companyId !== companyId || isRecent(item));
+  db.feedback = (db.feedback || []).filter((item) => item.companyId !== companyId || isRecent(item));
+  db.hseResponses = (db.hseResponses || []).filter((item) => item.companyId !== companyId || isRecent(item));
+  db.preventiveActions = (db.preventiveActions || []).filter((item) => item.companyId !== companyId || isRecent(item));
+  const after = companyDataCounts(db, companyId);
+  return {
+    before,
+    after,
+    removed: Object.fromEntries(Object.keys(before).map((key) => [key, Math.max(0, before[key] - after[key])])),
+  };
 }
 
 function publicUser(user) {
@@ -734,6 +788,7 @@ function platformCompanies(db) {
       active: access.active,
       expired: access.expired,
       employeeCount: company.employeeCount || users.length,
+      retentionDays: company.retentionDays || 180,
       teams: company.teams || [],
       users: users.length,
       checkins: checkins.length,
@@ -850,6 +905,7 @@ async function routeApi(req, res) {
         status: "trial",
         expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString().slice(0, 10),
         employeeCount: Number(body.employeeCount || 10),
+        retentionDays: 180,
         teams: teams.length ? teams : ["Geral"],
         createdAt: new Date().toISOString(),
       };
@@ -936,6 +992,7 @@ async function routeApi(req, res) {
       if (body.status) company.status = body.status;
       if (body.expiresAt !== undefined) company.expiresAt = String(body.expiresAt || "");
       if (body.employeeCount !== undefined) company.employeeCount = Number(body.employeeCount || company.employeeCount || 0);
+      if (body.retentionDays !== undefined) company.retentionDays = Math.min(1825, Math.max(30, Number(body.retentionDays || company.retentionDays || 180)));
       db.audit.push({ id: `audit_${Date.now()}`, action: "platform.company.updated", userId: user.id, companyId, date: new Date().toISOString(), changes: body });
       writeDb(db);
       sendJson(res, 200, { company: platformCompanies(db).find((item) => item.id === companyId) });
@@ -1003,6 +1060,9 @@ async function routeApi(req, res) {
         type: body.type || "privacy-checkin",
         text: body.text || "Uso de dados emocionais individuais para relatório pessoal e dados agregados para a empresa.",
         accepted: body.accepted !== false,
+        policyVersion: body.policyVersion || "2026-05-lgpd-mental-health",
+        ipHash: crypto.createHash("sha256").update(String(req.socket.remoteAddress || "local")).digest("hex").slice(0, 16),
+        userAgent: String(req.headers["user-agent"] || "").slice(0, 180),
         date: new Date().toISOString(),
       };
       db.consents = db.consents || [];
@@ -1010,6 +1070,137 @@ async function routeApi(req, res) {
       db.audit.push({ id: `audit_${Date.now()}`, action: "consent.recorded", userId: user.id, date: consent.date });
       writeDb(db);
       sendJson(res, 201, { consent });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/account/password") {
+      const body = await readBody(req);
+      if (String(body.newPassword || "").length < 8) {
+        sendJson(res, 400, { error: "A nova senha precisa ter pelo menos 8 caracteres" });
+        return;
+      }
+      if (!verifyPassword(String(body.currentPassword || ""), user)) {
+        sendJson(res, 401, { error: "Senha atual incorreta" });
+        return;
+      }
+      user.salt = "";
+      user.passwordHash = createPasswordHash(body.newPassword);
+      addAudit(db, { action: "account.password.changed", userId: user.id, companyId: user.companyId });
+      writeDb(db);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
+    if (req.method === "PATCH" && url.pathname.startsWith("/api/users/") && url.pathname.endsWith("/password")) {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      const targetUserId = decodeURIComponent(url.pathname.split("/")[3]);
+      const targetUser = db.users.find((item) => item.id === targetUserId && item.companyId === user.companyId);
+      if (!targetUser) {
+        sendJson(res, 404, { error: "Usuário não encontrado" });
+        return;
+      }
+      const body = await readBody(req);
+      if (String(body.newPassword || "").length < 8) {
+        sendJson(res, 400, { error: "A nova senha precisa ter pelo menos 8 caracteres" });
+        return;
+      }
+      targetUser.salt = "";
+      targetUser.passwordHash = createPasswordHash(body.newPassword);
+      addAudit(db, { action: "user.password.reset", userId: user.id, targetUserId: targetUser.id, companyId: user.companyId });
+      writeDb(db);
+      sendJson(res, 200, { ok: true, user: publicUser(targetUser) });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/admin/governance") {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      const company = db.companies.find((item) => item.id === user.companyId);
+      sendJson(res, 200, {
+        company: {
+          id: company.id,
+          name: company.name,
+          retentionDays: company.retentionDays || 180,
+        },
+        counts: companyDataCounts(db, user.companyId),
+      });
+      return;
+    }
+
+    if (req.method === "PATCH" && url.pathname === "/api/admin/governance") {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      const body = await readBody(req);
+      const retentionDays = Number(body.retentionDays || 180);
+      if (retentionDays < 30 || retentionDays > 1825) {
+        sendJson(res, 400, { error: "A retenção precisa ficar entre 30 e 1825 dias" });
+        return;
+      }
+      const company = db.companies.find((item) => item.id === user.companyId);
+      company.retentionDays = retentionDays;
+      addAudit(db, { action: "governance.retention.updated", userId: user.id, companyId: user.companyId, changes: { retentionDays } });
+      writeDb(db);
+      sendJson(res, 200, { company: { id: company.id, name: company.name, retentionDays: company.retentionDays }, counts: companyDataCounts(db, user.companyId) });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/admin/apply-retention") {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      const company = db.companies.find((item) => item.id === user.companyId);
+      const result = applyRetentionPolicy(db, user.companyId, company.retentionDays || 180);
+      addAudit(db, { action: "governance.retention.applied", userId: user.id, companyId: user.companyId, changes: result.removed });
+      writeDb(db);
+      sendJson(res, 200, { result, counts: companyDataCounts(db, user.companyId) });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/admin/purge-company-data") {
+      if (user.role !== "admin") {
+        sendJson(res, 403, { error: "Acesso restrito a administradores" });
+        return;
+      }
+      const body = await readBody(req);
+      if (String(body.confirmation || "").trim() !== "EXCLUIR DADOS") {
+        sendJson(res, 400, { error: "Digite EXCLUIR DADOS para confirmar" });
+        return;
+      }
+      const before = purgeCompanyOperationalData(db, user.companyId, { keepAudit: true });
+      addAudit(db, { action: "company.operational_data.purged", userId: user.id, companyId: user.companyId, changes: before });
+      writeDb(db);
+      sendJson(res, 200, { ok: true, removed: before, counts: companyDataCounts(db, user.companyId) });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/admin/audit") {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      const logs = (db.audit || [])
+        .filter((item) => item.companyId === user.companyId || item.userId === user.id)
+        .slice(-120)
+        .reverse()
+        .map((item) => ({
+          id: item.id,
+          action: item.action,
+          userId: item.userId,
+          targetUserId: item.targetUserId || "",
+          companyId: item.companyId || "",
+          date: item.date,
+          detail: item.detail || "",
+          changes: item.changes || {},
+        }));
+      sendJson(res, 200, { logs });
       return;
     }
 
