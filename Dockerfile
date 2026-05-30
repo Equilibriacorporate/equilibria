@@ -7,6 +7,7 @@ COPY server.js ./
 COPY index.html ./
 COPY styles.css ./
 COPY app.js ./
+COPY logo-equilibria.svg ./
 COPY venda.html ./
 COPY venda.css ./
 COPY politica-privacidade.html ./

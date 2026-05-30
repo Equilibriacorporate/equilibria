@@ -2053,7 +2053,7 @@ textarea {
     left: 0;
     z-index: 12;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 2px;
     padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--line);

@@ -25,6 +25,7 @@ const mimeTypes = {
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".png": "image/png",
+  ".svg": "image/svg+xml; charset=utf-8",
   ".pdf": "application/pdf",
   ".md": "text/markdown; charset=utf-8",
 };
@@ -924,7 +925,11 @@ function routeStatic(req, res) {
       res.end("Not found");
       return;
     }
-    res.writeHead(200, { ...securityHeaders, "Content-Type": mimeTypes[path.extname(filePath)] || "application/octet-stream" });
+    res.writeHead(200, {
+      ...securityHeaders,
+      "Content-Type": mimeTypes[path.extname(filePath)] || "application/octet-stream",
+      "Cache-Control": "no-store, max-age=0",
+    });
     res.end(data);
   });
 }
