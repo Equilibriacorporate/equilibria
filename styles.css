@@ -105,14 +105,15 @@ body:not([data-authenticated="true"]) .mobile-bottom-nav {
   display: grid;
   place-items: center;
   position: relative;
-  border-radius: 8px;
-  background: var(--green-soft);
+  border-radius: 10px;
+  background: #ffffff;
   overflow: hidden;
+  box-shadow: 0 8px 18px rgba(35, 49, 47, 0.08);
 }
 
 .brand-mark img {
-  width: 104px;
-  height: 32px;
+  width: 120px;
+  height: 36px;
   max-width: none;
   object-fit: cover;
   object-position: left center;
@@ -1608,7 +1609,7 @@ textarea {
 }
 
 .auth-brand img {
-  width: min(280px, 82vw);
+  width: min(360px, 86vw);
   height: auto;
 }
 
