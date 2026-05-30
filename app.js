@@ -7,6 +7,7 @@ const demoAccounts = {
 let authToken = localStorage.getItem("equilibria_token") || "";
 let currentUser = null;
 let dashboardState = null;
+document.body.dataset.authenticated = "false";
 
 const navButtons = document.querySelectorAll(".nav-item");
 const roleButtons = document.querySelectorAll(".role-button");
@@ -30,6 +31,9 @@ const userForm = document.querySelector("#userForm");
 const userList = document.querySelector("#userList");
 const feedbackForm = document.querySelector("#feedbackForm");
 const anonymousList = document.querySelector("#anonymousList");
+const meetingPlan = document.querySelector("#meetingPlan");
+const teamForm = document.querySelector("#teamForm");
+const teamChipList = document.querySelector("#teamChipList");
 const hseForm = document.querySelector("#hseForm");
 const hseQuestionsContainer = document.querySelector("#hseQuestions");
 const hseStatus = document.querySelector("#hseStatus");
@@ -118,7 +122,6 @@ function allowedSections() {
       ...(hasFeature("hasAssistant") ? ["assistant"] : []),
       ...(hasFeature("hasFeedback") ? ["feedback"] : []),
       ...(hasFeature("hasRhChat") ? ["rhchat"] : []),
-      "onboarding",
     ];
   }
   return [
@@ -161,9 +164,12 @@ async function loadAppData() {
     await loadAuditLogs();
   }
   if (currentUser?.role !== "employee") {
+    await loadTeams();
     await loadFeedback();
     await loadActionPlan();
     await loadNr1Report();
+  } else if (hasFeature("hasFeedback")) {
+    await loadFeedback();
   }
   if (hasFeature("hasRhChat")) await loadRhChat();
   applyAccessControl();
@@ -188,6 +194,7 @@ function resetClientSession() {
   currentUser = null;
   dashboardState = null;
   localStorage.removeItem("equilibria_token");
+  document.body.dataset.authenticated = "false";
   updateUserBadge();
   authModal.classList.add("show");
 }
@@ -230,6 +237,7 @@ async function loginWithCredentials(email, password, acceptedLegal = false) {
   currentUser = data.user;
   localStorage.setItem("equilibria_token", authToken);
   authModal.classList.remove("show");
+  document.body.dataset.authenticated = "true";
   updateUserBadge();
   await loadAppData();
   setRole(currentUser.role === "employee" ? "employee" : "manager", false);
@@ -254,6 +262,7 @@ async function registerCompany(formData) {
   currentUser = data.user;
   localStorage.setItem("equilibria_token", authToken);
   authModal.classList.remove("show");
+  document.body.dataset.authenticated = "true";
   updateUserBadge();
   await loadAppData();
   setRole("manager", false);
@@ -263,9 +272,11 @@ async function registerCompany(formData) {
 
 function updateUserBadge() {
   if (!currentUser) {
+    document.body.dataset.authenticated = "false";
     currentUserBadge.textContent = "Não conectado";
     return;
   }
+  document.body.dataset.authenticated = "true";
   const role = isPlatformAdmin() ? "Admin Equilibria" : currentUser.role === "employee" ? "Colaborador" : "RH/Gestor";
   currentUserBadge.textContent = `${currentUser.name} · ${role}`;
 }
@@ -302,15 +313,22 @@ async function loadUsers() {
 
 async function loadFeedback() {
   if (!anonymousList) return;
-  if (!currentUser || currentUser.role === "employee") {
-    anonymousList.innerHTML = "<p>Relatos enviados aqui aparecem para RH/Gestor sem identificação pessoal.</p>";
-    return;
-  }
   try {
     const data = await request("/api/feedback");
     renderFeedback(data.feedback);
   } catch (error) {
     anonymousList.innerHTML = `<p>${error.message}</p>`;
+  }
+}
+
+async function loadTeams() {
+  if (!teamChipList) return;
+  if (!currentUser || currentUser.role === "employee") return;
+  try {
+    const data = await request("/api/teams");
+    renderTeamChips(data.teams || []);
+  } catch (error) {
+    teamChipList.innerHTML = `<p>${error.message}</p>`;
   }
 }
 
@@ -720,22 +738,104 @@ function renderNr1Report(data) {
 
 function renderFeedback(items) {
   if (!items.length) {
-    anonymousList.innerHTML = "<p>Nenhum relato anônimo registrado ainda.</p>";
+    anonymousList.innerHTML = currentUser?.role === "employee"
+      ? "<p>Você ainda não enviou nenhum relato. Quando o RH responder, a devolutiva aparecerá aqui.</p>"
+      : "<p>Nenhum relato anônimo registrado ainda.</p>";
+    renderMeetingPlan([]);
     return;
   }
+  renderMeetingPlan(items);
+  const canManage = currentUser?.role !== "employee";
   anonymousList.innerHTML = items
     .map(
       (item) => `
         <article class="anonymous-item ${item.sentiment}">
           <div>
             <strong>${labelCategory(item.category)}</strong>
-            <span>${item.team || "Equipe não informada"} · ${labelSentiment(item.sentiment)}</span>
+            <span>${escapeHtml(item.team || "Equipe não informada")} · ${labelSentiment(item.sentiment)}</span>
           </div>
           <p>${escapeHtml(item.message)}</p>
+          <small>${new Date(item.createdAt).toLocaleString("pt-BR")}</small>
+          ${item.suggestion ? renderFeedbackSuggestion(item.suggestion) : ""}
+          ${renderFeedbackResponses(item.responses || [])}
+          ${
+            canManage
+              ? `
+                <div class="feedback-actions">
+                  <button class="ghost-button" type="button" data-suggest-feedback="${item.id}">Sugerir ação</button>
+                </div>
+                <div class="feedback-response-form">
+                  <textarea rows="2" data-feedback-response="${item.id}" placeholder="Responder ao colaborador sem revelar identidade"></textarea>
+                  <button class="primary-button" type="button" data-send-feedback-response="${item.id}">Enviar resposta</button>
+                </div>
+              `
+              : ""
+          }
         </article>
       `,
     )
     .join("");
+}
+
+function renderFeedbackSuggestion(suggestion) {
+  if (!suggestion) return "";
+  return `
+    <div class="feedback-suggestion">
+      <strong>${escapeHtml(suggestion.focus || "Ação preventiva")}</strong>
+      <p>${escapeHtml(suggestion.action || "")}</p>
+      <span>${escapeHtml(suggestion.meetingAgenda || "")}</span>
+      <small>Prazo sugerido: ${escapeHtml(suggestion.deadline || "7 dias")}</small>
+    </div>
+  `;
+}
+
+function renderFeedbackResponses(responses) {
+  if (!responses.length) return "";
+  return `
+    <div class="feedback-response-list">
+      ${responses
+        .map(
+          (response) => `
+            <div class="feedback-response">
+              <strong>Resposta do RH</strong>
+              <p>${escapeHtml(response.message)}</p>
+              <small>${new Date(response.createdAt).toLocaleString("pt-BR")}</small>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderMeetingPlan(items) {
+  if (!meetingPlan) return;
+  const suggested = items.filter((item) => item.suggestion);
+  if (!suggested.length) {
+    meetingPlan.innerHTML = "<p>Use “Sugerir ação” nos relatos para montar a pauta preventiva do RH.</p>";
+    return;
+  }
+  meetingPlan.innerHTML = suggested
+    .slice(0, 5)
+    .map(
+      (item) => `
+        <article>
+          <strong>${escapeHtml(item.suggestion.focus)}</strong>
+          <p>${escapeHtml(item.suggestion.meetingAgenda)}</p>
+          <small>${escapeHtml(item.team || "Equipe não informada")} · ${labelSentiment(item.sentiment)}</small>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function renderTeamChips(teams) {
+  if (!teamChipList) return;
+  if (!teams.length) {
+    teamChipList.innerHTML = "<p>Nenhuma equipe cadastrada ainda.</p>";
+    return;
+  }
+  teamChipList.innerHTML = teams.map((team) => `<span>${escapeHtml(team)}</span>`).join("");
 }
 
 function renderRhChat(messages, canManage) {
@@ -1200,6 +1300,51 @@ feedbackForm?.addEventListener("submit", async (event) => {
     await loadActionPlan();
     await loadNr1Report();
     showToast("Relato anônimo enviado com segurança.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+teamForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(teamForm);
+  try {
+    const data = await request("/api/teams", {
+      method: "POST",
+      body: JSON.stringify({ team: formData.get("team") }),
+    });
+    renderTeamChips(data.teams || []);
+    teamForm.reset();
+    await loadDashboard();
+    showToast("Equipe cadastrada para relatórios e métricas.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+anonymousList?.addEventListener("click", async (event) => {
+  const suggestButton = event.target.closest("[data-suggest-feedback]");
+  const responseButton = event.target.closest("[data-send-feedback-response]");
+  try {
+    if (suggestButton) {
+      const id = suggestButton.dataset.suggestFeedback;
+      suggestButton.disabled = true;
+      suggestButton.textContent = "Gerando...";
+      await request(`/api/feedback/${encodeURIComponent(id)}/suggestion`, { method: "POST" });
+      await loadFeedback();
+      showToast("Ação preventiva sugerida para o RH.");
+    }
+    if (responseButton) {
+      const id = responseButton.dataset.sendFeedbackResponse;
+      const field = anonymousList.querySelector(`[data-feedback-response="${CSS.escape(id)}"]`);
+      const message = field?.value || "";
+      await request(`/api/feedback/${encodeURIComponent(id)}/response`, {
+        method: "POST",
+        body: JSON.stringify({ message }),
+      });
+      await loadFeedback();
+      showToast("Resposta enviada ao colaborador.");
+    }
   } catch (error) {
     showToast(error.message);
   }

@@ -112,6 +112,7 @@
           <div class="account-panel">
             <span id="currentUser">Conectando...</span>
             <div class="top-actions">
+              <a class="ghost-button whatsapp-top" href="https://api.whatsapp.com/send?text=Ol%C3%A1%2C%20quero%20conhecer%20o%20Equilibria%20e%20testar%20na%20minha%20empresa%20por%2030%20dias." target="_blank" rel="noopener">WhatsApp</a>
               <button class="ghost-button" id="exportReport" type="button">Exportar relatório</button>
               <button class="ghost-button" id="logoutButton" type="button">Sair</button>
               <button class="primary-button" data-open-checkin type="button">Registrar agora</button>
@@ -372,10 +373,24 @@
           <div class="section-heading">
             <div>
               <p class="eyebrow">Leitura coletiva</p>
-              <h2 id="teamTitle">Saúde emocional das equipes</h2>
+              <h2 id="teamTitle">Equipes e métricas</h2>
             </div>
             <span class="status-pill private">Dados anonimizados</span>
           </div>
+
+          <article class="panel compact-command-panel">
+            <div class="panel-title">
+              <div>
+                <h3>Cadastrar equipe</h3>
+                <span>RH pode criar áreas para separar métricas e relatórios</span>
+              </div>
+            </div>
+            <form class="inline-command-form" id="teamForm">
+              <input name="team" required placeholder="Ex.: Atendimento, Comercial, Operações" />
+              <button class="primary-button" type="submit">Adicionar equipe</button>
+            </form>
+            <div class="team-chip-list" id="teamChipList"></div>
+          </article>
 
           <div class="team-table" id="teamTable"></div>
         </section>
@@ -530,9 +545,18 @@
             <article class="panel">
               <div class="panel-title">
                 <h3>Painel de escuta</h3>
-                <span>Visão RH/Gestor</span>
+                <span>Queixas, resposta e ação sugerida</span>
               </div>
               <div class="anonymous-list" id="anonymousList"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-title">
+                <h3>Pauta para reunião</h3>
+                <span>Gerada a partir das queixas</span>
+              </div>
+              <div class="meeting-plan" id="meetingPlan">
+                <p>Selecione “Sugerir ação” em um relato para montar a abordagem do RH.</p>
+              </div>
             </article>
           </div>
         </section>
@@ -677,7 +701,7 @@
             <article class="panel">
               <h3>Próximos passos comerciais</h3>
               <ol class="clean-list">
-                <li>Oferecer piloto de 30 dias para 1 a 3 equipes.</li>
+                <li>Oferecer demo de 30 dias: 15 dias Enterprise e 15 dias Profissional.</li>
                 <li>Medir adesão, sinais de risco e qualidade dos relatórios.</li>
                 <li>Converter para contrato anual com implantação assistida.</li>
               </ol>

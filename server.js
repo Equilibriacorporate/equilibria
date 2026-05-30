@@ -266,8 +266,9 @@ function createSeedData() {
       {
         id: "c_demo",
         name: "Empresa Demo",
-        plan: "Profissional",
+        plan: "Enterprise",
         status: "trial",
+        trialSchedule: "15 dias Enterprise + 15 dias Profissional",
         expiresAt: "2026-06-30",
         employeeCount: 100,
         retentionDays: 180,
@@ -312,6 +313,11 @@ function readDb() {
   db.preventiveActions = db.preventiveActions || [];
   db.hseResponses = db.hseResponses || [];
   db.audit = db.audit || [];
+  db.companies = (db.companies || []).map((company) => ({
+    ...company,
+    plan: company.id === "c_demo" && company.status === "trial" ? "Enterprise" : company.plan,
+    trialSchedule: company.trialSchedule || (company.status === "trial" ? "15 dias Enterprise + 15 dias Profissional" : ""),
+  }));
   return db;
 }
 
@@ -418,6 +424,48 @@ function companyAccessStatus(company = {}) {
 function requireFeature(db, user, feature) {
   const plan = companyPlan(db, user);
   return Boolean(plan[feature]);
+}
+
+function buildFeedbackSuggestion(item = {}) {
+  const text = `${item.category || ""} ${item.sentiment || ""} ${item.message || ""}`.toLowerCase();
+  if (text.includes("assédio") || text.includes("humilha") || text.includes("ameaça") || text.includes("retalia")) {
+    return {
+      focus: "Risco relacional/compliance",
+      meetingAgenda: "Verificar segurança psicológica, canais formais, histórico de recorrência e necessidade de apuração preservando sigilo.",
+      action: "Registrar evidências, acionar RH/Compliance, proteger a pessoa de exposição e comunicar condutas esperadas sem identificar autor.",
+      deadline: "72 horas",
+    };
+  }
+  if (text.includes("carga") || text.includes("sobrecarga") || text.includes("escala") || text.includes("prazo") || text.includes("meta")) {
+    return {
+      focus: "Sobrecarga e organização do trabalho",
+      meetingAgenda: "Revisar volume de demandas, prioridades, prazos, escala, pausas e distribuição real da carga.",
+      action: "Fazer ajuste de prioridades por 7 dias, suspender demandas não essenciais e pactuar limite claro de urgências.",
+      deadline: "7 dias",
+    };
+  }
+  if (text.includes("lider") || text.includes("gestor") || text.includes("chefe") || text.includes("apoio")) {
+    return {
+      focus: "Apoio da liderança",
+      meetingAgenda: "Checar clareza de expectativas, frequência de alinhamento, qualidade do apoio e forma de cobrança.",
+      action: "Criar ritual semanal de alinhamento com líder, registrar combinados e acompanhar percepção de apoio nos check-ins.",
+      deadline: "14 dias",
+    };
+  }
+  if (text.includes("comunica") || text.includes("mudança") || text.includes("processo") || text.includes("clareza")) {
+    return {
+      focus: "Comunicação e clareza de processo",
+      meetingAgenda: "Mapear onde falta informação, quais mudanças geram ruído e quais decisões precisam ser documentadas.",
+      action: "Publicar combinados de prioridade, responsáveis e próximos passos; abrir espaço de dúvidas por equipe.",
+      deadline: "10 dias",
+    };
+  }
+  return {
+    focus: "Escuta e prevenção",
+    meetingAgenda: "Entender frequência, impacto na jornada, equipes afetadas e se o tema aparece também em check-ins/HSE.",
+    action: "Agrupar relatos por tema, abrir escuta segura com a liderança e definir uma medida preventiva simples para testar na semana.",
+    deadline: "7 a 14 dias",
+  };
 }
 
 function publicChatThreadId(companyId, userId) {
@@ -960,8 +1008,9 @@ async function routeApi(req, res) {
       const company = {
         id: companyId,
         name: String(body.companyName).trim(),
-        plan: "Profissional",
+        plan: "Enterprise",
         status: "trial",
+        trialSchedule: "15 dias Enterprise + 15 dias Profissional",
         expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString().slice(0, 10),
         employeeCount: Number(body.employeeCount || 10),
         retentionDays: 180,
@@ -1117,6 +1166,36 @@ async function routeApi(req, res) {
       db.audit.push({ id: `audit_${Date.now()}`, action: "user.created", userId: user.id, targetUserId: newUser.id, date: new Date().toISOString() });
       writeDb(db);
       sendJson(res, 201, { user: publicUser(newUser), users: db.users.filter((item) => item.companyId === user.companyId).map(publicUser) });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/teams") {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      const company = db.companies.find((item) => item.id === user.companyId);
+      sendJson(res, 200, { teams: company?.teams || [] });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/teams") {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      const body = await readBody(req);
+      const team = String(body.team || "").trim();
+      if (!team) {
+        sendJson(res, 400, { error: "Informe o nome da equipe." });
+        return;
+      }
+      const company = db.companies.find((item) => item.id === user.companyId);
+      company.teams = company.teams || [];
+      if (!company.teams.includes(team)) company.teams.push(team);
+      addAudit(db, { action: "team.created", userId: user.id, companyId: user.companyId, detail: team });
+      writeDb(db);
+      sendJson(res, 201, { teams: company.teams });
       return;
     }
 
@@ -1599,11 +1678,14 @@ async function routeApi(req, res) {
       const feedback = {
         id: `feedback_${Date.now()}`,
         companyId: user.companyId,
+        userId: user.id,
         team: body.team ? String(body.team) : user.team,
         category: body.category || "jornada",
         sentiment: body.sentiment || "neutro",
         message: String(body.message).trim(),
         anonymous: true,
+        responses: [],
+        suggestion: null,
         createdAt: new Date().toISOString(),
       };
       db.feedback = db.feedback || [];
@@ -1619,12 +1701,9 @@ async function routeApi(req, res) {
         sendJson(res, 403, { error: "Voz anônima disponível nos planos Profissional e Enterprise." });
         return;
       }
-      if (!requireManager(user)) {
-        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
-        return;
-      }
       const items = (db.feedback || [])
         .filter((item) => item.companyId === user.companyId)
+        .filter((item) => requireManager(user) || item.userId === user.id)
         .slice(-50)
         .reverse()
         .map((item) => ({
@@ -1635,8 +1714,66 @@ async function routeApi(req, res) {
           message: item.message,
           anonymous: true,
           createdAt: item.createdAt,
+          suggestion: item.suggestion || null,
+          responses: (item.responses || []).map((response) => ({
+            id: response.id,
+            message: response.message,
+            createdAt: response.createdAt,
+            senderRole: response.senderRole,
+          })),
         }));
       sendJson(res, 200, { feedback: items });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname.match(/^\/api\/feedback\/[^/]+\/suggestion$/)) {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      const feedbackId = decodeURIComponent(url.pathname.split("/")[3]);
+      const item = (db.feedback || []).find((entry) => entry.id === feedbackId && entry.companyId === user.companyId);
+      if (!item) {
+        sendJson(res, 404, { error: "Relato não encontrado." });
+        return;
+      }
+      item.suggestion = buildFeedbackSuggestion(item);
+      item.updatedAt = new Date().toISOString();
+      addAudit(db, { action: "feedback.suggestion.generated", userId: user.id, companyId: user.companyId, detail: feedbackId });
+      writeDb(db);
+      sendJson(res, 200, { suggestion: item.suggestion });
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname.match(/^\/api\/feedback\/[^/]+\/response$/)) {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito a RH/Gestor" });
+        return;
+      }
+      const feedbackId = decodeURIComponent(url.pathname.split("/")[3]);
+      const item = (db.feedback || []).find((entry) => entry.id === feedbackId && entry.companyId === user.companyId);
+      if (!item) {
+        sendJson(res, 404, { error: "Relato não encontrado." });
+        return;
+      }
+      const body = await readBody(req);
+      const message = String(body.message || "").trim();
+      if (!message) {
+        sendJson(res, 400, { error: "Escreva a resposta antes de enviar." });
+        return;
+      }
+      item.responses = item.responses || [];
+      item.responses.push({
+        id: `response_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
+        senderUserId: user.id,
+        senderRole: user.role,
+        message,
+        createdAt: new Date().toISOString(),
+      });
+      item.updatedAt = new Date().toISOString();
+      addAudit(db, { action: "feedback.response.created", userId: user.id, companyId: user.companyId, detail: feedbackId });
+      writeDb(db);
+      sendJson(res, 201, { feedback: item });
       return;
     }
 
@@ -1840,6 +1977,7 @@ async function callOpenAIAssistant(message, context) {
           },
         ],
         max_output_tokens: 650,
+        temperature: 0.8,
       }),
     });
 
