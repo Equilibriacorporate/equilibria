@@ -131,6 +131,10 @@ body:not([data-authenticated="true"]) .mobile-bottom-nav {
   display: none !important;
 }
 
+body:not([data-platform-admin="true"]) .platform-admin-only {
+  display: none !important;
+}
+
 .role-button {
   min-height: 36px;
   border: 0;

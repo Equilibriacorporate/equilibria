@@ -114,6 +114,7 @@ function allowedSections() {
   if (currentUser.role === "manager" || currentUser.role === "admin") {
     return [
       "dashboard",
+      "admin",
       "hse",
       "teams",
       "interventions",
@@ -164,6 +165,7 @@ async function loadAppData() {
     await loadAuditLogs();
   }
   if (currentUser?.role !== "employee") {
+    await loadUsers();
     await loadTeams();
     await loadFeedback();
     await loadActionPlan();
@@ -299,8 +301,8 @@ async function loadPersonalReport() {
 
 async function loadUsers() {
   if (!userList) return;
-  if (!isPlatformAdmin()) {
-    userList.innerHTML = "<p>Área restrita à administração Equilibria.</p>";
+  if (!currentUser || currentUser.role === "employee") {
+    userList.innerHTML = "<p>Área restrita ao RH/Gestor.</p>";
     return;
   }
   try {
@@ -1269,7 +1271,7 @@ userForm.addEventListener("submit", async (event) => {
     });
     renderUsers(data.users);
     userForm.reset();
-    await loadAuditLogs();
+    if (isPlatformAdmin()) await loadAuditLogs();
     showToast("Usuário criado com sucesso.");
   } catch (error) {
     showToast(error.message);
@@ -1455,7 +1457,7 @@ resetPasswordForm?.addEventListener("submit", async (event) => {
       body: JSON.stringify({ newPassword: formData.get("newPassword") }),
     });
     resetPasswordForm.reset();
-    await loadAuditLogs();
+    if (isPlatformAdmin()) await loadAuditLogs();
     showToast("Senha do usuário redefinida.");
   } catch (error) {
     showToast(error.message);

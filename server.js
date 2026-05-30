@@ -1124,8 +1124,8 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "GET" && url.pathname === "/api/users") {
-      if (!requirePlatformAdmin(user)) {
-        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito ao RH/Gestor." });
         return;
       }
       const users = db.users.filter((item) => item.companyId === user.companyId).map(publicUser);
@@ -1134,8 +1134,8 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "POST" && url.pathname === "/api/users") {
-      if (!requirePlatformAdmin(user)) {
-        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito ao RH/Gestor." });
         return;
       }
       const body = await readBody(req);
@@ -1246,8 +1246,8 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "PATCH" && url.pathname.startsWith("/api/users/") && url.pathname.endsWith("/password")) {
-      if (!requirePlatformAdmin(user)) {
-        sendJson(res, 403, { error: "Acesso restrito à administração Equilibria." });
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito ao RH/Gestor." });
         return;
       }
       const targetUserId = decodeURIComponent(url.pathname.split("/")[3]);
