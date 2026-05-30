@@ -13,6 +13,9 @@ const MIN_TEAM_SAMPLE = Number(globalThis.process?.env?.MIN_TEAM_SAMPLE || 3);
 const OPENAI_API_KEY = globalThis.process?.env?.OPENAI_API_KEY || "";
 const OPENAI_MODEL = globalThis.process?.env?.OPENAI_MODEL || "gpt-4o-mini";
 const OPENAI_TIMEOUT_MS = Number(globalThis.process?.env?.OPENAI_TIMEOUT_MS || 18000);
+const PLATFORM_ADMIN_EMAIL = String(globalThis.process?.env?.PLATFORM_ADMIN_EMAIL || "").trim().toLowerCase();
+const PLATFORM_ADMIN_PASSWORD = String(globalThis.process?.env?.PLATFORM_ADMIN_PASSWORD || "");
+const PLATFORM_ADMIN_NAME = String(globalThis.process?.env?.PLATFORM_ADMIN_NAME || "Admin Equilibria").trim();
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(ROOT, "data");
 const DB_PATH = path.join(DATA_DIR, "equilibria-db.json");
@@ -227,6 +230,7 @@ function createSeedData() {
       name: "Lucas Admin",
       email: "admin@equilibria.demo",
       role: "admin",
+      platformAdmin: true,
       team: "Diretoria",
       salt,
       passwordHash: hashPassword(demoPassword, salt),
@@ -306,6 +310,63 @@ function ensureDb({ reset = false } = {}) {
   }
 }
 
+function applyPlatformAdminConfig(db) {
+  if (!PLATFORM_ADMIN_EMAIL || !PLATFORM_ADMIN_PASSWORD) return false;
+  let changed = false;
+  db.companies = db.companies || [];
+  db.users = db.users || [];
+  let platformCompany = db.companies.find((company) => company.id === "c_platform");
+  if (!platformCompany) {
+    platformCompany = {
+      id: "c_platform",
+      name: "Equilibria Corporate",
+      plan: "Enterprise",
+      status: "active",
+      expiresAt: "",
+      employeeCount: 1,
+      retentionDays: 180,
+      teams: ["Administração"],
+      platformOwner: true,
+      createdAt: new Date().toISOString(),
+    };
+    db.companies.push(platformCompany);
+    changed = true;
+  }
+
+  let owner = db.users.find((user) => user.email === PLATFORM_ADMIN_EMAIL);
+  if (!owner) {
+    owner = createUser({
+      companyId: "c_platform",
+      name: PLATFORM_ADMIN_NAME,
+      email: PLATFORM_ADMIN_EMAIL,
+      role: "admin",
+      team: "Administração",
+      password: PLATFORM_ADMIN_PASSWORD,
+      platformAdmin: true,
+    });
+    db.users.push(owner);
+    changed = true;
+  } else {
+    if (owner.companyId !== "c_platform") {
+      owner.companyId = "c_platform";
+      changed = true;
+    }
+    if (owner.role !== "admin") {
+      owner.role = "admin";
+      changed = true;
+    }
+    if (!owner.platformAdmin) {
+      owner.platformAdmin = true;
+      changed = true;
+    }
+    if (owner.name !== PLATFORM_ADMIN_NAME) {
+      owner.name = PLATFORM_ADMIN_NAME;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 function readDb() {
   ensureDb();
   const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
@@ -319,6 +380,7 @@ function readDb() {
     plan: company.id === "c_demo" && company.status === "trial" ? "Enterprise" : company.plan,
     trialSchedule: company.trialSchedule || (company.status === "trial" ? "15 dias Enterprise + 15 dias Profissional" : ""),
   }));
+  if (applyPlatformAdminConfig(db)) fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf8");
   return db;
 }
 
@@ -390,6 +452,7 @@ function publicUser(user) {
     email: user.email,
     role: user.role,
     team: user.team,
+    platformAdmin: isPlatformAdminUser(user),
   };
 }
 
@@ -397,8 +460,12 @@ function requireManager(user) {
   return user.role === "manager" || user.role === "admin";
 }
 
+function isPlatformAdminUser(user = {}) {
+  return Boolean(user.platformAdmin) || (PLATFORM_ADMIN_EMAIL && user.email === PLATFORM_ADMIN_EMAIL) || user.email === "admin@equilibria.demo";
+}
+
 function requirePlatformAdmin(user) {
-  return user.role === "admin" && user.email === "admin@equilibria.demo";
+  return user.role === "admin" && isPlatformAdminUser(user);
 }
 
 function currentMonthKey(date = new Date()) {
@@ -729,13 +796,14 @@ function buildNr1Report(db, user, month = currentMonthKey()) {
   };
 }
 
-function createUser({ companyId, name, email, role, team, password }) {
+function createUser({ companyId, name, email, role, team, password, platformAdmin = false }) {
   return {
     id: `u_${crypto.randomBytes(8).toString("hex")}`,
     companyId,
     name: String(name).trim(),
     email: String(email).trim().toLowerCase(),
     role: role || "employee",
+    platformAdmin: Boolean(platformAdmin),
     team: team || "Geral",
     salt: "",
     passwordHash: createPasswordHash(password),

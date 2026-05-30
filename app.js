@@ -95,7 +95,7 @@ function switchSection(sectionId) {
 }
 
 function isPlatformAdmin() {
-  return currentUser?.role === "admin" && currentUser?.email === "admin@equilibria.demo";
+  return currentUser?.role === "admin" && currentUser?.platformAdmin === true;
 }
 
 function planFeatures() {
@@ -414,9 +414,8 @@ async function loadNr1Report() {
 
 async function loadPlatformCompanies() {
   if (!platformAdminPanel || !platformCompanyList) return;
-  const isPlatformAdmin = currentUser?.role === "admin" && currentUser?.email === "admin@equilibria.demo";
-  platformAdminPanel.style.display = isPlatformAdmin ? "grid" : "none";
-  if (!isPlatformAdmin) return;
+  platformAdminPanel.style.display = isPlatformAdmin() ? "grid" : "none";
+  if (!isPlatformAdmin()) return;
   try {
     const data = await request("/api/platform/companies");
     renderPlatformCompanies(data.companies || []);
