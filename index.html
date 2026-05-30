@@ -112,6 +112,7 @@
             <div class="top-actions">
               <a class="ghost-button whatsapp-top" href="https://api.whatsapp.com/send?text=Ol%C3%A1%2C%20quero%20conhecer%20o%20Equilibria%20e%20testar%20na%20minha%20empresa%20por%2030%20dias." target="_blank" rel="noopener">WhatsApp</a>
               <button class="ghost-button" id="exportReport" type="button">Exportar relatório</button>
+              <button class="ghost-button" id="demoModeButton" type="button">Modo demo</button>
               <button class="ghost-button" id="logoutButton" type="button">Sair</button>
               <button class="primary-button" data-open-checkin type="button">Registrar agora</button>
             </div>
@@ -146,6 +147,33 @@
               <h2 id="dashboardTitle">Painel executivo</h2>
             </div>
             <span class="status-pill stable" id="riskSummary">Risco moderado controlado</span>
+          </div>
+
+          <div class="guided-actions" id="guidedActions">
+            <button class="guided-action" data-section-shortcut="checkin" data-role-action="employee" type="button">
+              <strong>Registrar meu dia</strong>
+              <span>Check-in de entrada ou saída</span>
+            </button>
+            <button class="guided-action" data-section-shortcut="assistant" data-role-action="employee" type="button">
+              <strong>Falar com a IA</strong>
+              <span>Apoio interno com orientação</span>
+            </button>
+            <button class="guided-action" data-section-shortcut="feedback" data-role-action="employee" type="button">
+              <strong>Enviar relato</strong>
+              <span>Escuta segura e anônima</span>
+            </button>
+            <button class="guided-action" data-section-shortcut="admin" data-role-action="manager" type="button">
+              <strong>Cadastrar pessoas</strong>
+              <span>Equipe pronta para usar</span>
+            </button>
+            <button class="guided-action" data-section-shortcut="actionplan" data-role-action="manager" type="button">
+              <strong>Gerar plano RH</strong>
+              <span>Prioridades e intervenções</span>
+            </button>
+            <button class="guided-action" id="printMonthlyReport" data-role-action="manager" type="button">
+              <strong>Relatório mensal</strong>
+              <span>PDF/print para cliente</span>
+            </button>
           </div>
 
           <div class="metric-grid">
@@ -187,6 +215,11 @@
               <strong id="nextBestAction">Abrir Plano RH</strong>
               <small>Use dados agregados para orientar lideranca e jornada.</small>
             </article>
+            <article class="executive-card">
+              <span>Pauta RH</span>
+              <strong id="meetingAgendaQuick">Montando...</strong>
+              <small id="complaintFocusQuick">Queixas e HSE entram aqui.</small>
+            </article>
           </div>
 
           <div class="two-column">
@@ -217,6 +250,37 @@
             </div>
             <div class="platform-company-list" id="platformCompanyList"></div>
           </article>
+        </section>
+
+        <section class="workspace-section" id="demo" aria-labelledby="demoTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Venda assistida</p>
+              <h2 id="demoTitle">Modo demonstração comercial</h2>
+            </div>
+            <span class="status-pill stable">Apresente sem se perder</span>
+          </div>
+          <div class="demo-grid">
+            <article class="panel">
+              <h3>Entrar como colaborador</h3>
+              <p>Mostre check-in, IA de apoio, relato anônimo e relatório pessoal.</p>
+              <button class="primary-button wide" data-demo-login="employee" type="button">Ver colaborador</button>
+            </article>
+            <article class="panel">
+              <h3>Entrar como RH</h3>
+              <p>Mostre pessoas, riscos, escuta, plano RH, HSE, NR-1/PGR e chat.</p>
+              <button class="primary-button wide" data-demo-login="manager" type="button">Ver RH</button>
+            </article>
+            <article class="panel">
+              <h3>Roteiro de venda</h3>
+              <ol class="clean-list">
+                <li>Abra o painel executivo e mostre risco, prioridade e próxima ação.</li>
+                <li>Mostre o painel de escuta com sugestão preventiva.</li>
+                <li>Gere o relatório mensal para tangibilizar entrega ao cliente.</li>
+              </ol>
+              <button class="ghost-button wide" id="copyDemoScript" type="button">Copiar roteiro</button>
+            </article>
+          </div>
         </section>
 
         <section class="workspace-section" id="checkin" aria-labelledby="checkinTitle">

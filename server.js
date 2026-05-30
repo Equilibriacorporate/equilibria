@@ -16,6 +16,7 @@ const OPENAI_TIMEOUT_MS = Number(globalThis.process?.env?.OPENAI_TIMEOUT_MS || 1
 const PLATFORM_ADMIN_EMAIL = String(globalThis.process?.env?.PLATFORM_ADMIN_EMAIL || "").trim().toLowerCase();
 const PLATFORM_ADMIN_PASSWORD = String(globalThis.process?.env?.PLATFORM_ADMIN_PASSWORD || "");
 const PLATFORM_ADMIN_NAME = String(globalThis.process?.env?.PLATFORM_ADMIN_NAME || "Admin Equilibria").trim();
+const COMMERCIAL_WHATSAPP_URL = String(globalThis.process?.env?.COMMERCIAL_WHATSAPP_URL || "https://api.whatsapp.com/send?text=Ol%C3%A1%2C%20quero%20conhecer%20o%20Equilibria%20e%20testar%20na%20minha%20empresa%20por%2030%20dias.").trim();
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(ROOT, "data");
 const DB_PATH = path.join(DATA_DIR, "equilibria-db.json");
@@ -893,6 +894,11 @@ function buildDashboard(db, user) {
   const energy = average(entries.map((entry) => entry.energy));
   const risk = average(entries.map(riskScore));
   const teams = teamSummaries(db, user);
+  const visibleTeams = teams.filter((team) => !team.sampleProtected);
+  const topTeam = visibleTeams.slice().sort((a, b) => (b.risk || 0) - (a.risk || 0))[0] || null;
+  const urgentFeedback = (db.feedback || []).filter((item) => item.companyId === user.companyId && item.sentiment === "urgente").length;
+  const monthKey = currentMonthKey();
+  const hseThisMonth = (db.hseResponses || []).filter((item) => item.companyId === user.companyId && item.month === monthKey).length;
   const alerts = teams
     .slice()
     .sort((a, b) => (b.risk || 0) - (a.risk || 0))
@@ -911,6 +917,13 @@ function buildDashboard(db, user) {
     company,
     plan: companyPlan(db, user),
     currentUser: publicUser(user),
+    executive: {
+      priority: topTeam ? `${topTeam.team} (${topTeam.risk}% de risco)` : "Aumentar adesão para leitura segura",
+      complaintFocus: urgentFeedback ? `${urgentFeedback} relato(s) urgente(s)` : "Sem relato urgente no momento",
+      meetingAgenda: topTeam ? `Revisar carga, apoio e prioridades da equipe ${topTeam.team}.` : "Comunicar adesão ao check-in e reforçar segurança psicológica.",
+      nextAction: risk >= 45 ? "Acionar plano de intervenção do RH em até 7 dias." : "Manter monitoramento semanal e preparar devolutiva mensal.",
+      hseStatus: hseThisMonth ? `${hseThisMonth} resposta(s) HSE no mês` : "Liberar HSE mensal para colaboradores.",
+    },
     metrics: {
       mood,
       energy,
@@ -1013,6 +1026,14 @@ async function routeApi(req, res) {
         service: "equilibria",
         uptimeSeconds: Math.round(globalThis.process?.uptime?.() || 0),
         checkedAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/public-config") {
+      sendJson(res, 200, {
+        whatsappUrl: COMMERCIAL_WHATSAPP_URL,
+        trialOffer: "30 dias: 15 dias Enterprise + 15 dias Profissional",
       });
       return;
     }
@@ -1870,8 +1891,21 @@ async function routeApi(req, res) {
           generatedAt: new Date().toISOString(),
           company: dashboard.company.name,
           metrics: dashboard.metrics,
+          executive: dashboard.executive,
           teams: dashboard.teams,
           alerts: dashboard.alerts,
+          feedback: (db.feedback || [])
+            .filter((item) => item.companyId === user.companyId)
+            .slice(-20)
+            .map((item) => ({
+              team: item.team,
+              category: item.category,
+              sentiment: item.sentiment,
+              message: item.message,
+              suggestion: item.suggestion || buildFeedbackSuggestion(item),
+              createdAt: item.createdAt,
+            })),
+          actionPlan: buildActionPlan(db, user),
           nr1: requireManager(user) && requireFeature(db, user, "hasNr1") ? buildNr1Report(db, user) : null,
         },
       });

@@ -2,6 +2,7 @@ const API = "";
 const demoAccounts = {
   employee: { email: "colaborador@equilibria.demo", password: "demo123" },
   manager: { email: "rh@equilibria.demo", password: "demo123" },
+  admin: { email: "admin@equilibria.demo", password: "demo123" },
 };
 
 let authToken = localStorage.getItem("equilibria_token") || "";
@@ -109,11 +110,12 @@ function hasFeature(feature) {
 function allowedSections() {
   if (!currentUser) return ["dashboard"];
   if (isPlatformAdmin()) {
-    return ["dashboard", "checkin", "hse", "personal", "teams", "interventions", "actionplan", "nr1", "assistant", "feedback", "rhchat", "commercial", "onboarding", "governance", "admin"];
+    return ["dashboard", "demo", "checkin", "hse", "personal", "teams", "interventions", "actionplan", "nr1", "assistant", "feedback", "rhchat", "commercial", "onboarding", "governance", "admin"];
   }
   if (currentUser.role === "manager" || currentUser.role === "admin") {
     return [
       "dashboard",
+      "demo",
       "admin",
       "hse",
       "teams",
@@ -127,6 +129,7 @@ function allowedSections() {
   }
   return [
     "checkin",
+    "demo",
     ...(hasFeature("hasHse") ? ["hse"] : []),
     "personal",
     ...(hasFeature("hasAssistant") ? ["assistant"] : []),
@@ -292,6 +295,17 @@ function setRole(role, notify = true) {
 async function loadDashboard() {
   dashboardState = await request("/api/dashboard");
   renderDashboard(dashboardState);
+}
+
+async function loadPublicConfig() {
+  try {
+    const data = await request("/api/public-config");
+    document.querySelectorAll(".whatsapp-top").forEach((link) => {
+      if (data.whatsappUrl) link.href = data.whatsappUrl;
+    });
+  } catch {
+    // Public config is optional; the default WhatsApp CTA remains available.
+  }
 }
 
 async function loadPersonalReport() {
@@ -956,10 +970,14 @@ function renderDashboard(data) {
   const topRiskAction = document.querySelector("#topRiskAction");
   const nr1Readiness = document.querySelector("#nr1Readiness");
   const nextBestAction = document.querySelector("#nextBestAction");
+  const meetingAgendaQuick = document.querySelector("#meetingAgendaQuick");
+  const complaintFocusQuick = document.querySelector("#complaintFocusQuick");
   if (topRiskTeam) topRiskTeam.textContent = topTeam ? `${topTeam.team} · ${topTeam.risk}%` : "Amostra protegida";
   if (topRiskAction) topRiskAction.textContent = topTeam && topTeam.risk >= 45 ? "Abrir escuta com lideranca e revisar carga em ate 7 dias." : "Manter check-ins e observar tendencia semanal.";
   if (nr1Readiness) nr1Readiness.textContent = metrics.count >= 10 ? "Evidencias em formacao" : "Coletar mais sinais";
   if (nextBestAction) nextBestAction.textContent = metrics.risk >= 45 ? "Acionar Plano RH" : "Revisar NR-1/PGR";
+  if (meetingAgendaQuick) meetingAgendaQuick.textContent = data.executive?.meetingAgenda || "Preparar devolutiva mensal.";
+  if (complaintFocusQuick) complaintFocusQuick.textContent = data.executive?.complaintFocus || "Sem urgencia no momento.";
 
   renderAlerts(alerts);
   renderTeams(teams);
@@ -1102,6 +1120,71 @@ async function exportSummary() {
   }
 }
 
+async function openMonthlyReport() {
+  const data = await request("/api/export");
+  const report = data.report || {};
+  const teams = report.teams || [];
+  const feedback = report.feedback || [];
+  const actions = report.actionPlan?.actions || [];
+  const html = `
+    <!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <title>Relatório mensal Equilibria</title>
+        <style>
+          body{font-family:Arial,sans-serif;margin:36px;color:#23312f;background:#fff}
+          header{border-bottom:3px solid #3f7f68;padding-bottom:18px;margin-bottom:22px}
+          h1{font-family:Georgia,serif;font-size:34px;margin:0}
+          h2{margin-top:28px;color:#3f7f68}
+          .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+          .card{border:1px solid #dfe8e2;border-radius:8px;padding:14px}
+          .card strong{display:block;font-size:24px}
+          table{width:100%;border-collapse:collapse;margin-top:10px}
+          th,td{border-bottom:1px solid #e6ede7;padding:9px;text-align:left}
+          li{margin-bottom:8px}
+          .print{position:fixed;right:20px;top:20px}
+          @media print{.print{display:none}body{margin:18px}}
+        </style>
+      </head>
+      <body>
+        <button class="print" onclick="window.print()">Salvar como PDF</button>
+        <header>
+          <h1>Equilibria</h1>
+          <p>Relatório mensal executivo - ${escapeHtml(report.company || "Empresa")}</p>
+          <small>Gerado em ${new Date(report.generatedAt || Date.now()).toLocaleString("pt-BR")}</small>
+        </header>
+        <section class="grid">
+          <div class="card"><span>Humor</span><strong>${decimal(report.metrics?.mood || 0)}</strong></div>
+          <div class="card"><span>Energia</span><strong>${percent((report.metrics?.energy || 0) * 10)}</strong></div>
+          <div class="card"><span>Risco</span><strong>${percent(report.metrics?.risk || 0)}</strong></div>
+          <div class="card"><span>Adesão</span><strong>${percent(report.metrics?.checkinRate || 0)}</strong></div>
+        </section>
+        <h2>Leitura executiva</h2>
+        <ul>
+          <li><strong>Prioridade:</strong> ${escapeHtml(report.executive?.priority || "Monitorar adesão e risco coletivo.")}</li>
+          <li><strong>Pauta RH:</strong> ${escapeHtml(report.executive?.meetingAgenda || "Preparar devolutiva mensal.")}</li>
+          <li><strong>Próxima ação:</strong> ${escapeHtml(report.executive?.nextAction || "Manter acompanhamento.")}</li>
+        </ul>
+        <h2>Equipes</h2>
+        <table><thead><tr><th>Equipe</th><th>Humor</th><th>Energia</th><th>Risco</th><th>Amostra</th></tr></thead><tbody>
+          ${teams.map((team) => `<tr><td>${escapeHtml(team.team)}</td><td>${team.mood ?? "Protegida"}</td><td>${team.energy ?? "Protegida"}</td><td>${team.risk ?? "Protegida"}</td><td>${team.count}</td></tr>`).join("")}
+        </tbody></table>
+        <h2>Escuta e queixas</h2>
+        <ul>${feedback.slice(0, 8).map((item) => `<li><strong>${escapeHtml(item.team || "Equipe")}</strong>: ${escapeHtml(item.message)}<br><small>${escapeHtml(item.suggestion?.action || "")}</small></li>`).join("") || "<li>Sem relatos no período.</li>"}</ul>
+        <h2>Plano de ação sugerido</h2>
+        <ul>${actions.slice(0, 8).map((item) => `<li><strong>${escapeHtml(item.title || item.riskKey || "Ação")}</strong>: ${escapeHtml(item.action || item.evidence || "Acompanhar evolução.")}</li>`).join("") || "<li>Sem ações abertas.</li>"}</ul>
+      </body>
+    </html>`;
+  const reportWindow = window.open("", "_blank", "noopener,noreferrer");
+  if (!reportWindow) {
+    showToast("Permita pop-ups para abrir o relatório mensal.");
+    return;
+  }
+  reportWindow.document.write(html);
+  reportWindow.document.close();
+}
+
 async function downloadJson(path, fallbackName) {
   const data = await request(path);
   const payload = data.backup || data.report || data;
@@ -1216,6 +1299,32 @@ document.querySelectorAll("[data-open-checkin]").forEach((button) => {
 
 document.querySelectorAll("[data-section-shortcut]").forEach((button) => {
   button.addEventListener("click", () => switchSection(button.dataset.sectionShortcut));
+});
+
+document.querySelectorAll("[data-demo-login]").forEach((button) => {
+  button.addEventListener("click", () => login(button.dataset.demoLogin));
+});
+
+document.querySelector("#demoModeButton")?.addEventListener("click", () => switchSection("demo"));
+
+document.querySelector("#printMonthlyReport")?.addEventListener("click", async () => {
+  try {
+    await openMonthlyReport();
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+document.querySelector("#copyDemoScript")?.addEventListener("click", async () => {
+  const script = [
+    "1. Abra o Painel executivo e mostre prioridade, risco e próxima ação.",
+    "2. Mostre o menu Pessoas para cadastrar colaboradores.",
+    "3. Abra Escuta anônima e clique em Sugerir ação.",
+    "4. Gere o Relatório mensal e explique a entrega ao RH.",
+    "5. Feche com a demo de 30 dias: 15 dias Enterprise + 15 dias Profissional.",
+  ].join("\n");
+  await navigator.clipboard?.writeText(script);
+  showToast("Roteiro de demo copiado.");
 });
 
 document.querySelectorAll("[data-plan]").forEach((button) => {
@@ -1677,6 +1786,7 @@ logoutButton.addEventListener("click", async () => {
 async function boot() {
   updateOutputs();
   updatePricing();
+  await loadPublicConfig();
   loadOnboardingState();
   addMessage("Olá. Sou uma primeira escuta de apoio. Não faço diagnóstico e não substituo cuidado profissional, mas posso ajudar a organizar o próximo passo com calma.");
   try {

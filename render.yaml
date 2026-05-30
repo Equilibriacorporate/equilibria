@@ -26,6 +26,8 @@ services:
         value: ""
       - key: PLATFORM_ADMIN_PASSWORD
         value: ""
+      - key: COMMERCIAL_WHATSAPP_URL
+        value: "https://api.whatsapp.com/send?text=Ol%C3%A1%2C%20quero%20conhecer%20o%20Equilibria%20e%20testar%20na%20minha%20empresa%20por%2030%20dias."
     disk:
       name: equilibria-data
       mountPath: /opt/render/project/src/data
