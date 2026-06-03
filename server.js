@@ -15,7 +15,7 @@ const OPENAI_MODEL = globalThis.process?.env?.OPENAI_MODEL || "gpt-4o-mini";
 const OPENAI_TIMEOUT_MS = Number(globalThis.process?.env?.OPENAI_TIMEOUT_MS || 18000);
 const PLATFORM_ADMIN_EMAIL = String(globalThis.process?.env?.PLATFORM_ADMIN_EMAIL || "").trim().toLowerCase();
 const PLATFORM_ADMIN_PASSWORD = String(globalThis.process?.env?.PLATFORM_ADMIN_PASSWORD || "");
-const PLATFORM_ADMIN_NAME = String(globalThis.process?.env?.PLATFORM_ADMIN_NAME || "Admin Equilibria").trim();
+const PLATFORM_ADMIN_NAME = String(globalThis.process?.env?.PLATFORM_ADMIN_NAME || "INGRID").trim();
 const COMMERCIAL_WHATSAPP_URL = String(globalThis.process?.env?.COMMERCIAL_WHATSAPP_URL || "https://api.whatsapp.com/send?text=Ol%C3%A1%2C%20quero%20conhecer%20o%20Equilibria%20e%20testar%20na%20minha%20empresa%20por%2030%20dias.").trim();
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(ROOT, "data");
@@ -327,6 +327,7 @@ function applyPlatformAdminConfig(db) {
       employeeCount: 1,
       retentionDays: 180,
       teams: ["Administração"],
+      inviteCode: crypto.randomBytes(4).toString("hex").toUpperCase(),
       platformOwner: true,
       createdAt: new Date().toISOString(),
     };
@@ -371,17 +372,23 @@ function applyPlatformAdminConfig(db) {
 function readDb() {
   ensureDb();
   const db = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
+  let changed = false;
   db.feedback = db.feedback || [];
   db.chatMessages = db.chatMessages || [];
   db.preventiveActions = db.preventiveActions || [];
   db.hseResponses = db.hseResponses || [];
   db.audit = db.audit || [];
-  db.companies = (db.companies || []).map((company) => ({
-    ...company,
-    plan: company.id === "c_demo" && company.status === "trial" ? "Enterprise" : company.plan,
-    trialSchedule: company.trialSchedule || (company.status === "trial" ? "15 dias Enterprise + 15 dias Profissional" : ""),
-  }));
-  if (applyPlatformAdminConfig(db)) fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf8");
+  db.companies = (db.companies || []).map((company) => {
+    if (!company.inviteCode) changed = true;
+    return {
+      ...company,
+      inviteCode: company.inviteCode || crypto.randomBytes(4).toString("hex").toUpperCase(),
+      plan: company.id === "c_demo" && company.status === "trial" ? "Enterprise" : company.plan,
+      trialSchedule: company.trialSchedule || (company.status === "trial" ? "15 dias Enterprise + 15 dias Profissional" : ""),
+    };
+  });
+  if (applyPlatformAdminConfig(db)) changed = true;
+  if (changed) fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf8");
   return db;
 }
 
@@ -491,6 +498,7 @@ function companyAccessStatus(company = {}) {
 }
 
 function requireFeature(db, user, feature) {
+  if (requirePlatformAdmin(user)) return true;
   const plan = companyPlan(db, user);
   return Boolean(plan[feature]);
 }
@@ -1075,6 +1083,62 @@ async function routeApi(req, res) {
       return;
     }
 
+    if (req.method === "POST" && url.pathname === "/api/register-employee") {
+      const body = await readBody(req);
+      const required = ["name", "email", "password", "companyCode"];
+      if (required.some((key) => !String(body[key] || "").trim())) {
+        sendJson(res, 400, { error: "Preencha nome, e-mail, senha e código da empresa." });
+        return;
+      }
+      if (String(body.password).length < 8) {
+        sendJson(res, 400, { error: "A senha precisa ter pelo menos 8 caracteres." });
+        return;
+      }
+      if (body.acceptedLegal !== true) {
+        sendJson(res, 400, { error: "Aceite os Termos de Uso e a Política de Privacidade." });
+        return;
+      }
+      const email = String(body.email).trim().toLowerCase();
+      if (db.users.some((item) => item.email === email)) {
+        sendJson(res, 409, { error: "E-mail já cadastrado." });
+        return;
+      }
+      const code = String(body.companyCode).trim().toUpperCase();
+      const company = db.companies.find((item) => String(item.inviteCode || "").toUpperCase() === code);
+      if (!company || company.platformOwner || companyAccessStatus(company).active !== true) {
+        sendJson(res, 400, { error: "Código da empresa inválido ou acesso indisponível." });
+        return;
+      }
+      company.teams = company.teams || ["Geral"];
+      const requestedTeam = String(body.team || "Geral").trim();
+      const team = company.teams.includes(requestedTeam) ? requestedTeam : company.teams[0] || "Geral";
+      const employee = createUser({
+        companyId: company.id,
+        name: body.name,
+        email,
+        role: "employee",
+        team,
+        password: body.password,
+      });
+      db.users.push(employee);
+      db.consents = db.consents || [];
+      db.consents.push({
+        id: `consent_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
+        companyId: company.id,
+        userId: employee.id,
+        type: "employee-self-registration",
+        text: "Cadastro voluntário, aceite dos Termos de Uso, Política de Privacidade e tratamento de dados emocionais.",
+        accepted: true,
+        policyVersion: "2026-06-self-registration",
+        date: new Date().toISOString(),
+      });
+      addAudit(db, { action: "user.self_registered", userId: employee.id, companyId: company.id });
+      writeDb(db);
+      const token = createSession(employee);
+      sendJson(res, 201, { token, user: publicUser(employee) });
+      return;
+    }
+
     if (req.method === "POST" && url.pathname === "/api/register-company") {
       const body = await readBody(req);
       const required = ["companyName", "name", "email", "password"];
@@ -1109,6 +1173,7 @@ async function routeApi(req, res) {
         employeeCount: Number(body.employeeCount || 10),
         retentionDays: 180,
         teams: teams.length ? teams : ["Geral"],
+        inviteCode: crypto.randomBytes(4).toString("hex").toUpperCase(),
         createdAt: new Date().toISOString(),
       };
       const owner = createUser({
@@ -1224,6 +1289,19 @@ async function routeApi(req, res) {
       }
       const users = db.users.filter((item) => item.companyId === user.companyId).map(publicUser);
       sendJson(res, 200, { users });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/company/invite") {
+      if (!requireManager(user)) {
+        sendJson(res, 403, { error: "Acesso restrito ao RH/Gestor." });
+        return;
+      }
+      const company = db.companies.find((item) => item.id === user.companyId);
+      sendJson(res, 200, {
+        company: company?.name || "",
+        inviteCode: company?.inviteCode || "",
+      });
       return;
     }
 
