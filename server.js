@@ -509,7 +509,8 @@ function requireManager(user) {
 }
 
 function isPlatformAdminUser(user = {}) {
-  return Boolean(user.platformAdmin) || (PLATFORM_ADMIN_EMAIL && user.email === PLATFORM_ADMIN_EMAIL) || user.email === "admin@equilibria.demo";
+  if (user.companyId === "c_demo" || String(user.email || "").endsWith("@equilibria.demo")) return false;
+  return user.companyId === "c_platform" && Boolean(user.platformAdmin) && Boolean(PLATFORM_ADMIN_EMAIL) && user.email === PLATFORM_ADMIN_EMAIL;
 }
 
 function requirePlatformAdmin(user) {
