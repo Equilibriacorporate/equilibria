@@ -21,7 +21,7 @@ services:
       - key: OPENAI_TIMEOUT_MS
         value: 18000
       - key: PLATFORM_ADMIN_NAME
-        value: INGRID
+        value: Admin Equilibria
       - key: PLATFORM_ADMIN_EMAIL
         value: ""
       - key: PLATFORM_ADMIN_PASSWORD

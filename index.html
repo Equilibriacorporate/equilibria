@@ -49,10 +49,6 @@
             <span aria-hidden="true">◎</span>
             Meu relatório
           </button>
-          <button class="nav-item" data-section="account" type="button">
-            <span aria-hidden="true">@</span>
-            Minha conta
-          </button>
           <button class="nav-item" data-section="teams" type="button">
             <span aria-hidden="true">◇</span>
             Equipes
@@ -880,31 +876,6 @@
           </div>
         </section>
 
-        <section class="workspace-section" id="account" aria-labelledby="accountTitle">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Segurança</p>
-              <h2 id="accountTitle">Minha conta</h2>
-            </div>
-            <span class="status-pill private">Acesso pessoal</span>
-          </div>
-          <div class="two-column">
-            <article class="panel">
-              <h3>Alterar minha senha</h3>
-              <form class="admin-form" id="accountPasswordForm">
-                <label>Senha atual <input name="currentPassword" required type="password" /></label>
-                <label>Nova senha <input name="newPassword" minlength="8" required type="password" /></label>
-                <button class="primary-button wide" type="submit">Salvar nova senha</button>
-              </form>
-            </article>
-            <article class="panel">
-              <h3>Privacidade e acesso</h3>
-              <p>Seu login é pessoal. Não compartilhe senha. O RH visualiza apenas informações permitidas pelo seu perfil e indicadores agregados.</p>
-              <a class="ghost-button wide" href="politica-privacidade.html" target="_blank" rel="noopener">Ver Política de Privacidade</a>
-            </article>
-          </div>
-        </section>
-
         <section class="workspace-section" id="admin" aria-labelledby="adminTitle">
           <div class="section-heading">
             <div>
@@ -915,14 +886,6 @@
           </div>
 
           <div class="admin-grid">
-            <article class="panel client-admin-only">
-              <h3>Link de cadastro da equipe</h3>
-              <p>Envie o código abaixo aos colaboradores para que criem o próprio login com segurança.</p>
-              <div class="invite-code-box">
-                <strong id="companyInviteCode">Carregando...</strong>
-                <button class="ghost-button" id="copyCompanyInviteCode" type="button">Copiar código</button>
-              </div>
-            </article>
             <article class="panel">
               <h3>Cadastrar colaborador</h3>
               <form class="admin-form" id="userForm">
@@ -1023,10 +986,6 @@
         <span aria-hidden="true">◎</span>
         Relatório
       </button>
-      <button class="nav-item mobile-tab" data-section="account" type="button">
-        <span aria-hidden="true">@</span>
-        Conta
-      </button>
       <button class="nav-item mobile-tab" data-section="onboarding" type="button">
         <span aria-hidden="true">1</span>
         Impl.
@@ -1052,22 +1011,7 @@
             <span>Li e aceito os <a href="termos-uso.html" target="_blank">Termos de Uso</a>, a <a href="politica-privacidade.html" target="_blank">Politica de Privacidade</a> e o uso dos meus dados para apoio emocional, indicadores agregados e gestao preventiva.</span>
           </label>
           <button class="primary-button wide" type="submit">Entrar</button>
-          <button class="ghost-button wide" data-auth-mode="employee-register" type="button">Registrar-se como colaborador</button>
           <button class="ghost-button wide" data-auth-mode="register" type="button">Criar empresa</button>
-        </form>
-
-        <form class="auth-form" id="employeeRegisterForm">
-          <label>Seu nome <input name="name" required placeholder="Nome completo" /></label>
-          <label>E-mail <input name="email" required type="email" placeholder="voce@empresa.com" /></label>
-          <label>Crie sua senha <input name="password" minlength="8" required type="password" /></label>
-          <label>Código da empresa <input name="companyCode" required placeholder="Código enviado pelo RH" /></label>
-          <label>Equipe <input name="team" placeholder="Ex.: Atendimento" /></label>
-          <label class="legal-acceptance">
-            <input name="acceptedLegal" required type="checkbox" />
-            <span>Li e aceito os <a href="termos-uso.html" target="_blank">Termos de Uso</a>, a <a href="politica-privacidade.html" target="_blank">Política de Privacidade</a> e o tratamento dos meus dados emocionais.</span>
-          </label>
-          <button class="primary-button wide" type="submit">Criar meu acesso</button>
-          <button class="ghost-button wide" data-auth-mode="login" type="button">Voltar ao login</button>
         </form>
 
         <form class="auth-form" id="registerForm">
