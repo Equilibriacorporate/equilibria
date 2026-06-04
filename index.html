@@ -15,6 +15,10 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body data-active-section="dashboard">
+    <div class="beta-banner" role="status">
+      <strong>Equilibria BETA</strong>
+      <span>Versao em desenvolvimento monitorado. Nao substitui avaliacao clinica, atendimento profissional ou servico de emergencia.</span>
+    </div>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Navegação principal">
         <div class="brand">
@@ -1041,12 +1045,13 @@
         <div>
           <p class="eyebrow">Acesso</p>
           <h2 id="authTitle">Entrar no Equilibria</h2>
+          <p class="beta-login-note">Versao BETA em desenvolvimento continuo. Recursos podem evoluir durante o piloto acompanhado.</p>
           <p>Use uma conta existente ou crie uma empresa para começar uma operação real.</p>
         </div>
 
         <form class="auth-form active" id="loginForm">
-          <label>E-mail <input name="email" required type="email" value="colaborador@equilibria.demo" /></label>
-          <label>Senha <input name="password" required type="password" value="demo123" /></label>
+          <label>E-mail <input name="email" autocomplete="email" required type="email" /></label>
+          <label>Senha <input name="password" autocomplete="current-password" required type="password" /></label>
           <label class="legal-acceptance">
             <input name="acceptedLegal" required type="checkbox" />
             <span>Li e aceito os <a href="termos-uso.html" target="_blank">Termos de Uso</a>, a <a href="politica-privacidade.html" target="_blank">Politica de Privacidade</a> e o uso dos meus dados para apoio emocional, indicadores agregados e gestao preventiva.</span>
@@ -1074,7 +1079,7 @@
           <label>Empresa <input name="companyName" required placeholder="Nome da empresa" /></label>
           <label>Seu nome <input name="name" required placeholder="Responsável" /></label>
           <label>E-mail <input name="email" required type="email" placeholder="voce@empresa.com" /></label>
-          <label>Senha <input name="password" minlength="6" required type="password" /></label>
+          <label>Senha <input name="password" minlength="8" required type="password" /></label>
           <label>Equipes iniciais <input name="teams" value="Geral,Atendimento,Comercial,Operações" /></label>
           <label class="legal-acceptance">
             <input name="acceptedTerms" required type="checkbox" />

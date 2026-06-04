@@ -13,7 +13,7 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: SESSION_TTL_MS
-        value: 28800000
+        value: 14400000
       - key: MIN_TEAM_SAMPLE
         value: 3
       - key: OPENAI_MODEL

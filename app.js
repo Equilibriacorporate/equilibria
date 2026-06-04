@@ -5,7 +5,7 @@ const demoAccounts = {
   admin: { email: "admin@equilibria.demo", password: "demo123" },
 };
 
-let authToken = localStorage.getItem("equilibria_token") || "";
+let authToken = sessionStorage.getItem("equilibria_token") || "";
 let currentUser = null;
 let dashboardState = null;
 document.body.dataset.authenticated = "false";
@@ -216,7 +216,7 @@ function resetClientSession() {
   authToken = "";
   currentUser = null;
   dashboardState = null;
-  localStorage.removeItem("equilibria_token");
+  sessionStorage.removeItem("equilibria_token");
   document.body.dataset.authenticated = "false";
   updateUserBadge();
   authModal.classList.add("show");
@@ -258,7 +258,7 @@ async function loginWithCredentials(email, password, acceptedLegal = false) {
   });
   authToken = data.token;
   currentUser = data.user;
-  localStorage.setItem("equilibria_token", authToken);
+  sessionStorage.setItem("equilibria_token", authToken);
   authModal.classList.remove("show");
   document.body.dataset.authenticated = "true";
   updateUserBadge();
@@ -283,7 +283,7 @@ async function registerCompany(formData) {
   });
   authToken = data.token;
   currentUser = data.user;
-  localStorage.setItem("equilibria_token", authToken);
+  sessionStorage.setItem("equilibria_token", authToken);
   authModal.classList.remove("show");
   document.body.dataset.authenticated = "true";
   updateUserBadge();
@@ -307,7 +307,7 @@ async function registerEmployee(formData) {
   });
   authToken = data.token;
   currentUser = data.user;
-  localStorage.setItem("equilibria_token", authToken);
+  sessionStorage.setItem("equilibria_token", authToken);
   authModal.classList.remove("show");
   document.body.dataset.authenticated = "true";
   updateUserBadge();
@@ -1035,8 +1035,8 @@ function renderAlerts(alerts) {
     .map(
       (alert) => `
         <article class="alert-item ${alert.level}">
-          <strong>${alert.title}</strong>
-          <p>${alert.text}</p>
+          <strong>${escapeHtml(alert.title)}</strong>
+          <p>${escapeHtml(alert.text)}</p>
         </article>
       `,
     )
@@ -1057,7 +1057,7 @@ function renderTeams(teams) {
       const riskWidth = team.sampleProtected ? 0 : team.risk;
       return `
         <article class="team-row">
-          <strong>${team.team}</strong>
+          <strong>${escapeHtml(team.team)}</strong>
           <div>
             <small>Humor ${mood}</small>
             <div class="progress"><span style="width:${moodWidth}%"></span></div>
@@ -1110,7 +1110,7 @@ function renderInterventions(teams) {
         <article class="intervention-card">
           <div>
             <span class="status-pill ${team.risk >= 45 ? "danger" : "private"}">${priority}</span>
-            <h3>${team.team}</h3>
+            <h3>${escapeHtml(team.team)}</h3>
           </div>
           <p>${action}</p>
           <small>Baseado em humor, energia, pressão e apoio agregado.</small>
@@ -1887,7 +1887,7 @@ async function boot() {
     }
   } catch {
     authToken = "";
-    localStorage.removeItem("equilibria_token");
+    sessionStorage.removeItem("equilibria_token");
     authModal.classList.add("show");
     updateUserBadge();
   }

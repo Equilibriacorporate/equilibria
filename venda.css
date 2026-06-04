@@ -591,3 +591,12 @@ p {
     padding: 20px 18px;
   }
 }
+.beta-chip {
+  padding: 3px 6px;
+  border: 1px solid #bfd5ca;
+  border-radius: 4px;
+  background: #eef7f2;
+  color: #3f705d;
+  font-size: 0.64rem;
+  font-weight: 800;
+}

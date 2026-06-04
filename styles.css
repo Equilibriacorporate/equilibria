@@ -32,6 +32,46 @@ body {
   font-weight: 400;
 }
 
+.beta-banner {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 7px 18px;
+  background: #edf5f1;
+  border-bottom: 1px solid #cfe1d8;
+  color: #385f52;
+  font-size: 0.76rem;
+  text-align: center;
+}
+
+.beta-banner strong {
+  color: #285344;
+  letter-spacing: 0;
+}
+
+.beta-login-note {
+  margin: 10px 0 0;
+  padding: 9px 10px;
+  border-left: 3px solid #6b9b89;
+  background: #f0f7f4;
+  color: #526b62;
+  font-size: 0.76rem;
+}
+
+@media (max-width: 720px) {
+  .beta-banner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+    padding: 7px 12px;
+    text-align: left;
+  }
+}
+
 button,
 input,
 select,

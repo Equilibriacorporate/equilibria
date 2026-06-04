@@ -9,6 +9,8 @@ const HOST = globalThis.process?.env?.HOST || "0.0.0.0";
 const SESSION_TTL_MS = Number(globalThis.process?.env?.SESSION_TTL_MS || 1000 * 60 * 60 * 8);
 const LOGIN_WINDOW_MS = 1000 * 60 * 10;
 const LOGIN_MAX_ATTEMPTS = 8;
+const REGISTRATION_WINDOW_MS = 1000 * 60 * 60;
+const REGISTRATION_MAX_ATTEMPTS = 5;
 const MIN_TEAM_SAMPLE = Number(globalThis.process?.env?.MIN_TEAM_SAMPLE || 3);
 const OPENAI_API_KEY = globalThis.process?.env?.OPENAI_API_KEY || "";
 const OPENAI_MODEL = globalThis.process?.env?.OPENAI_MODEL || "gpt-4o-mini";
@@ -22,6 +24,20 @@ const DATA_DIR = path.join(ROOT, "data");
 const DB_PATH = path.join(DATA_DIR, "equilibria-db.json");
 const sessions = new Map();
 const loginAttempts = new Map();
+const registrationAttempts = new Map();
+
+const publicFiles = new Set([
+  "/index.html",
+  "/styles.css",
+  "/app.js",
+  "/logo-equilibria.svg",
+  "/venda.html",
+  "/venda.css",
+  "/politica-privacidade.html",
+  "/termos-uso.html",
+  "/legal.css",
+  "/Equilibria-apresentacao-comercial.pdf",
+]);
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -39,7 +55,10 @@ const securityHeaders = {
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-  "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
 };
 
 const demoPassword = "demo123";
@@ -189,6 +208,20 @@ function isRateLimited(key) {
   return fresh.length > LOGIN_MAX_ATTEMPTS;
 }
 
+function isRegistrationRateLimited(key) {
+  const now = Date.now();
+  const current = registrationAttempts.get(key) || [];
+  const fresh = current.filter((time) => now - time < REGISTRATION_WINDOW_MS);
+  fresh.push(now);
+  registrationAttempts.set(key, fresh);
+  return fresh.length > REGISTRATION_MAX_ATTEMPTS;
+}
+
+function validEmail(value) {
+  const email = String(value || "").trim();
+  return email.length <= 180 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 function riskScore(entry) {
   const exhaustion = (10 - entry.energy) * 4;
   const pressure = entry.pressure * 4;
@@ -231,7 +264,7 @@ function createSeedData() {
       name: "Lucas Admin",
       email: "admin@equilibria.demo",
       role: "admin",
-      platformAdmin: true,
+      platformAdmin: false,
       team: "Diretoria",
       salt,
       passwordHash: hashPassword(demoPassword, salt),
@@ -378,6 +411,13 @@ function readDb() {
   db.preventiveActions = db.preventiveActions || [];
   db.hseResponses = db.hseResponses || [];
   db.audit = db.audit || [];
+  db.users = (db.users || []).map((user) => {
+    if (user.companyId === "c_demo" && user.platformAdmin) {
+      changed = true;
+      return { ...user, platformAdmin: false };
+    }
+    return user;
+  });
   db.companies = (db.companies || []).map((company) => {
     if (!company.inviteCode) changed = true;
     return {
@@ -833,7 +873,7 @@ function readBody(req) {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 1_000_000) {
+      if (body.length > 100_000) {
         req.destroy();
         reject(new Error("Body muito grande"));
       }
@@ -1002,8 +1042,13 @@ function buildPersonalReport(db, user) {
 function routeStatic(req, res) {
   const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
   const pathname = url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
+  if (!publicFiles.has(pathname)) {
+    res.writeHead(404, securityHeaders);
+    res.end("Not found");
+    return;
+  }
   const filePath = path.resolve(ROOT, `.${pathname}`);
-  if (!filePath.startsWith(ROOT)) {
+  if (path.dirname(filePath) !== ROOT) {
     res.writeHead(403);
     res.end("Forbidden");
     return;
@@ -1042,6 +1087,7 @@ async function routeApi(req, res) {
       sendJson(res, 200, {
         whatsappUrl: COMMERCIAL_WHATSAPP_URL,
         trialOffer: "30 dias: 15 dias Enterprise + 15 dias Profissional",
+        appStatus: "BETA",
       });
       return;
     }
@@ -1084,6 +1130,10 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "POST" && url.pathname === "/api/register-employee") {
+      if (isRegistrationRateLimited(`employee:${req.socket.remoteAddress || "local"}`)) {
+        sendJson(res, 429, { error: "Limite de cadastros atingido. Tente novamente mais tarde." });
+        return;
+      }
       const body = await readBody(req);
       const required = ["name", "email", "password", "companyCode"];
       if (required.some((key) => !String(body[key] || "").trim())) {
@@ -1092,6 +1142,10 @@ async function routeApi(req, res) {
       }
       if (String(body.password).length < 8) {
         sendJson(res, 400, { error: "A senha precisa ter pelo menos 8 caracteres." });
+        return;
+      }
+      if (!validEmail(body.email)) {
+        sendJson(res, 400, { error: "Informe um e-mail válido." });
         return;
       }
       if (body.acceptedLegal !== true) {
@@ -1140,14 +1194,22 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "POST" && url.pathname === "/api/register-company") {
+      if (isRegistrationRateLimited(`company:${req.socket.remoteAddress || "local"}`)) {
+        sendJson(res, 429, { error: "Limite de cadastros atingido. Tente novamente mais tarde." });
+        return;
+      }
       const body = await readBody(req);
       const required = ["companyName", "name", "email", "password"];
       if (required.some((key) => !String(body[key] || "").trim())) {
         sendJson(res, 400, { error: "Dados incompletos" });
         return;
       }
-      if (String(body.password).length < 6) {
-        sendJson(res, 400, { error: "A senha precisa ter pelo menos 6 caracteres" });
+      if (String(body.password).length < 8) {
+        sendJson(res, 400, { error: "A senha precisa ter pelo menos 8 caracteres" });
+        return;
+      }
+      if (!validEmail(body.email)) {
+        sendJson(res, 400, { error: "Informe um e-mail válido." });
         return;
       }
       if (body.acceptedTerms !== true || body.acceptedSensitiveData !== true) {
@@ -1210,8 +1272,7 @@ async function routeApi(req, res) {
     }
 
     if (req.method === "POST" && url.pathname === "/api/demo/reset") {
-      ensureDb({ reset: true });
-      sendJson(res, 200, { ok: true });
+      sendJson(res, 403, { error: "Reinicialização da demonstração desativada em produção." });
       return;
     }
 
@@ -2018,7 +2079,8 @@ async function routeApi(req, res) {
 
     sendJson(res, 404, { error: "Rota não encontrada" });
   } catch (error) {
-    sendJson(res, 500, { error: error.message || "Erro interno" });
+    console.error("API error:", error);
+    sendJson(res, 500, { error: "Não foi possível concluir a operação." });
   }
 }
 
