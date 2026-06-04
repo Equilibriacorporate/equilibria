@@ -193,6 +193,8 @@ p {
 .dashboard-preview,
 .pain-grid article,
 .feature-list article,
+.tour-grid article,
+.demo-steps article,
 .workflow-grid article,
 .proof-grid article,
 .pilot-card,
@@ -270,6 +272,8 @@ p {
 
 .pain-band,
 .section,
+.product-tour,
+.demo-band,
 .law-band,
 .workflow,
 .proof,
@@ -434,6 +438,75 @@ p {
   margin-bottom: 24px;
 }
 
+.product-tour {
+  background: #fff;
+}
+
+.product-tour .section-heading p:not(.eyebrow) {
+  max-width: 840px;
+}
+
+.tour-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.tour-grid article {
+  min-height: 205px;
+  padding: 20px;
+}
+
+.tour-grid span {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green-soft);
+  color: var(--green-dark);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.demo-band {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(320px, 0.65fr);
+  gap: 34px;
+  align-items: center;
+  background: linear-gradient(135deg, #edf6f1, #f8f6ee);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.demo-steps {
+  display: grid;
+  gap: 12px;
+}
+
+.demo-steps article {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  box-shadow: none;
+}
+
+.demo-steps b {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green-dark);
+  color: #fff;
+}
+
+.demo-steps span {
+  font-weight: 850;
+}
+
 .pricing .featured {
   border-color: rgba(49, 95, 84, 0.4);
   background: linear-gradient(180deg, #fff, var(--green-soft));
@@ -516,8 +589,10 @@ p {
   .pilot,
   .faq,
   .law-band,
+  .demo-band,
   .pain-grid,
   .feature-list,
+  .tour-grid,
   .workflow-grid,
   .proof-grid,
   .pricing {
@@ -569,6 +644,8 @@ p {
   .pain-band,
   .section,
   .law-band,
+  .product-tour,
+  .demo-band,
   .workflow,
   .proof,
   .pilot,
