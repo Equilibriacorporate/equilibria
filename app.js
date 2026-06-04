@@ -28,6 +28,7 @@ const backupButton = document.querySelector("#backupButton");
 const authModal = document.querySelector("#authModal");
 const loginForm = document.querySelector("#loginForm");
 const registerForm = document.querySelector("#registerForm");
+const employeeRegisterForm = document.querySelector("#employeeRegisterForm");
 const userForm = document.querySelector("#userForm");
 const userList = document.querySelector("#userList");
 const feedbackForm = document.querySelector("#feedbackForm");
@@ -53,6 +54,7 @@ const nr1ActionForm = document.querySelector("#nr1ActionForm");
 const nr1RiskKey = document.querySelector("#nr1RiskKey");
 const nr1ExportButton = document.querySelector("#nr1ExportButton");
 const passwordForm = document.querySelector("#passwordForm");
+const accountPasswordForm = document.querySelector("#accountPasswordForm");
 const resetPasswordForm = document.querySelector("#resetPasswordForm");
 const resetPasswordUser = document.querySelector("#resetPasswordUser");
 const governanceForm = document.querySelector("#governanceForm");
@@ -74,6 +76,8 @@ const rhChatStatus = document.querySelector("#rhChatStatus");
 const rhChatThreadSelect = document.querySelector("#rhChatThreadSelect");
 const rhChatThreadLabel = document.querySelector("#rhChatThreadLabel");
 const rhChatAnonymousLine = document.querySelector("#rhChatAnonymousLine");
+const companyInviteCode = document.querySelector("#companyInviteCode");
+const copyCompanyInviteCode = document.querySelector("#copyCompanyInviteCode");
 
 let hseQuestions = [];
 let nr1ReportState = null;
@@ -110,12 +114,13 @@ function hasFeature(feature) {
 function allowedSections() {
   if (!currentUser) return ["dashboard"];
   if (isPlatformAdmin()) {
-    return ["dashboard", "demo", "checkin", "hse", "personal", "teams", "interventions", "actionplan", "nr1", "assistant", "feedback", "rhchat", "commercial", "onboarding", "governance", "admin"];
+    return ["dashboard", "demo", "checkin", "hse", "personal", "account", "teams", "interventions", "actionplan", "nr1", "assistant", "feedback", "rhchat", "commercial", "onboarding", "governance", "admin"];
   }
   if (currentUser.role === "manager" || currentUser.role === "admin") {
     return [
       "dashboard",
       "demo",
+      "account",
       "admin",
       "hse",
       "teams",
@@ -130,6 +135,7 @@ function allowedSections() {
   return [
     "checkin",
     "demo",
+    "account",
     ...(hasFeature("hasHse") ? ["hse"] : []),
     "personal",
     ...(hasFeature("hasAssistant") ? ["assistant"] : []),
@@ -169,6 +175,7 @@ async function loadAppData() {
   }
   if (currentUser?.role !== "employee") {
     await loadUsers();
+    await loadCompanyInvite();
     await loadTeams();
     await loadFeedback();
     await loadActionPlan();
@@ -178,6 +185,17 @@ async function loadAppData() {
   }
   if (hasFeature("hasRhChat")) await loadRhChat();
   applyAccessControl();
+}
+
+async function loadCompanyInvite() {
+  if (!companyInviteCode || !currentUser || currentUser.role === "employee") return;
+  try {
+    const data = await request("/api/company/invite");
+    companyInviteCode.textContent = data.inviteCode || "Indisponível";
+    companyInviteCode.dataset.code = data.inviteCode || "";
+  } catch (error) {
+    companyInviteCode.textContent = error.message;
+  }
 }
 
 async function request(path, options = {}) {
@@ -275,6 +293,30 @@ async function registerCompany(formData) {
   showToast("Empresa criada. Você entrou como administrador.");
 }
 
+async function registerEmployee(formData) {
+  const data = await request("/api/register-employee", {
+    method: "POST",
+    body: JSON.stringify({
+      name: formData.get("name"),
+      email: formData.get("email"),
+      password: formData.get("password"),
+      companyCode: formData.get("companyCode"),
+      team: formData.get("team"),
+      acceptedLegal: formData.get("acceptedLegal") === "on",
+    }),
+  });
+  authToken = data.token;
+  currentUser = data.user;
+  localStorage.setItem("equilibria_token", authToken);
+  authModal.classList.remove("show");
+  document.body.dataset.authenticated = "true";
+  updateUserBadge();
+  await loadAppData();
+  setRole("employee", false);
+  switchSection(defaultSection());
+  showToast("Seu acesso foi criado com sucesso.");
+}
+
 function updateUserBadge() {
   if (!currentUser) {
     document.body.dataset.authenticated = "false";
@@ -282,7 +324,7 @@ function updateUserBadge() {
     return;
   }
   document.body.dataset.authenticated = "true";
-  const role = isPlatformAdmin() ? "Admin Equilibria" : currentUser.role === "employee" ? "Colaborador" : "RH/Gestor";
+  const role = isPlatformAdmin() ? "Dona da plataforma · acesso total" : currentUser.role === "employee" ? "Colaborador" : "RH/Gestor";
   currentUserBadge.textContent = `${currentUser.name} · ${role}`;
 }
 
@@ -574,6 +616,7 @@ function labelAuditAction(action) {
     "company.operational_data.purged": "Dados operacionais excluídos",
     "consent.recorded": "Consentimento registrado",
     "user.created": "Usuário criado",
+    "user.self_registered": "Colaborador criou o próprio acesso",
     "company.created": "Empresa criada",
     "company.plan.updated": "Plano atualizado",
     "platform.company.updated": "Cliente atualizado",
@@ -1341,6 +1384,7 @@ document.querySelectorAll("[data-auth-mode]").forEach((button) => {
     const mode = button.dataset.authMode;
     loginForm.classList.toggle("active", mode === "login");
     registerForm.classList.toggle("active", mode === "register");
+    employeeRegisterForm?.classList.toggle("active", mode === "employee-register");
   });
 });
 
@@ -1358,6 +1402,15 @@ registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
     await registerCompany(new FormData(registerForm));
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+employeeRegisterForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await registerEmployee(new FormData(employeeRegisterForm));
   } catch (error) {
     showToast(error.message);
   }
@@ -1553,6 +1606,38 @@ passwordForm?.addEventListener("submit", async (event) => {
     showToast("Senha alterada com sucesso.");
   } catch (error) {
     showToast(error.message);
+  }
+});
+
+accountPasswordForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(accountPasswordForm);
+  try {
+    await request("/api/account/password", {
+      method: "POST",
+      body: JSON.stringify({
+        currentPassword: formData.get("currentPassword"),
+        newPassword: formData.get("newPassword"),
+      }),
+    });
+    accountPasswordForm.reset();
+    showToast("Sua senha foi alterada.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+copyCompanyInviteCode?.addEventListener("click", async () => {
+  const code = companyInviteCode?.dataset.code || "";
+  if (!code) {
+    showToast("Código da empresa indisponível.");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(code);
+    showToast("Código de cadastro copiado.");
+  } catch {
+    showToast(`Código da empresa: ${code}`);
   }
 });
 

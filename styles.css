@@ -135,6 +135,10 @@ body:not([data-platform-admin="true"]) .platform-admin-only {
   display: none !important;
 }
 
+body[data-platform-admin="true"] .client-admin-only {
+  display: none !important;
+}
+
 .role-button {
   min-height: 36px;
   border: 0;
@@ -1603,6 +1607,25 @@ textarea {
   margin-top: 12px;
 }
 
+.invite-code-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--green-soft);
+}
+
+.invite-code-box strong {
+  color: var(--green);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 1.18rem;
+  letter-spacing: 0;
+}
+
 .user-row {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -1880,15 +1903,16 @@ textarea {
     width: 100%;
   }
 
-  .account-panel,
-  .top-actions,
-  .hero-actions,
-  .assistant-form,
-  .inline-command-form,
-  .feedback-response-form {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
+	  .account-panel,
+	  .top-actions,
+	  .hero-actions,
+	  .assistant-form,
+	  .inline-command-form,
+	  .feedback-response-form,
+	  .invite-code-box {
+	    display: grid;
+	    grid-template-columns: 1fr;
+	  }
 
   .primary-button,
   .ghost-button {
